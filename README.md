@@ -5,6 +5,9 @@
 
 Conçu pour la fluidité, Velora propose une approche de navigation récursive haute performance et une interface épurée sans compromis sur la puissance.
 
+<img width="1197" height="795" alt="image" src="https://github.com/user-attachments/assets/84202e81-9dce-461c-8fe4-e11034eff854" />
+
+
 ## Fonctionnalités clés
 
 *   **Moteur récursif ultra-rapide** : Indexation et recherche en temps réel sur toute l'arborescence.
