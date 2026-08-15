@@ -42,6 +42,11 @@ chmod +x explorer.js
 ```
 gjs explorer.js
 ```
+
+## Note liée a l'utilisation de l'intelligence artificiel
+
+**Velora Explorer** est un projet où l'architecture et les choix de conception sont définis par l'humain, tandis que l'intelligence artificielle intervient en tant qu'assistante d'exécution pour la réalisation (partielle), l'uniformisation du code, la résolution technique et la documentation ainsi que la réalisation de commentaires.
+
 ## Licence
 
 Ce projet est sous licence GNU Affero General Public License v3.0.
