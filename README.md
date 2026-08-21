@@ -5,7 +5,7 @@
 
 Conçu pour la fluidité, Velora propose une approche de navigation récursive haute performance et une interface épurée sans compromis sur la puissance.
 
-<img width="1198" height="797" alt="image" src="https://github.com/user-attachments/assets/aeb91b2e-ad19-4e77-b4bc-11a2f80fced1" />
+<img width="1437" height="902" alt="image" src="https://github.com/user-attachments/assets/9ca3cc7d-f75b-4561-94b3-6438c0a91c19" />
 
 ## Fonctionnalités clés
 
