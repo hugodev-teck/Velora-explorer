@@ -1,7 +1,23 @@
 #!/usr/bin/gjs
 
 imports.gi.versions.Gtk = '4.0';
-const { Gtk, Gio, GObject, GLib, Gdk, Adw } = imports.gi;
+const { Gtk, Gio, GObject, GLib, Gdk, GdkPixbuf, Adw } = imports.gi;
+
+const logoSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<path d="M157.57 101.43C163.47 100.28 176.05 102.34 182.14 103.76C211.25 110.52 236.17 130.45 247.76 158.34C250.58 165.12 252.81 172.5 253.84 179.78C254.48 184.31 254.04 189.45 255.16 193.81C261.49 194.92 268.72 194.04 275.17 194.04C288.26 194.04 301.36 194.04 314.45 194.04C356.52 194.04 398.62 193.64 440.69 194.05C449.48 194.13 458.25 196.03 466.39 199.19C469.86 200.53 474.59 204.45 478.03 204.59C480.16 207.21 483.86 208.62 486.39 210.99C492.79 216.96 498.53 223.44 502.81 231.05C505.9 236.53 508.25 242.55 509.97 248.5C510.76 251.22 510.21 255.9 511.92 258.15C511.92 321.4 511.92 384.64 511.92 447.89C510.69 449.53 511.42 451.48 510.94 453.33C510.01 456.96 509.09 460.54 507.84 464.07C504.28 474.13 498.17 483.19 490.65 490.9C482.63 499.12 471.74 505.98 460.8 509.06C458.34 509.75 449.39 510.76 447.9 511.92C344.09 511.92 240.27 511.92 136.46 511.92C133.94 510.34 129.76 510.59 126.84 509.83C123.63 509 120.36 507.94 117.29 506.67C101.55 500.14 88 487.98 80.2 472.74C71.95 456.6 72.1 439.74 72.1 421.99C72.1 410.61 72.1 399.24 72.1 387.86C72.1 337.36 72.1 286.86 72.1 236.36C72.1 204.96 68.77 174.42 85.35 146.36C95.75 128.77 113.3 113.87 132.64 107.2C138.75 105.09 145.57 104.21 151.41 102.03C153.38 101.3 155.85 102.6 157.57 101.43Z" fill="#7da5ff" fill-rule="evenodd" stroke="#7da5ff" stroke-width="0.25" stroke-linejoin="round"/>
+<path d="M477.37 93.05C477.45 96.03 477.7 98.5 478.25 101.23C479.5 107.46 478.28 116.67 478.28 123.21C478.28 138.95 478.28 154.69 478.28 170.43C478.28 178.38 478.28 186.33 478.28 194.28C478.28 197.51 478.87 201.55 478.03 204.59C474.59 204.45 469.86 200.53 466.39 199.19C458.25 196.03 449.48 194.13 440.69 194.05C398.62 193.64 356.52 194.04 314.45 194.04C301.36 194.04 288.26 194.04 275.17 194.04C268.72 194.04 261.49 194.92 255.16 193.81C254.04 189.45 254.48 184.31 253.84 179.78C252.81 172.5 250.58 165.12 247.76 158.34C236.17 130.45 211.25 110.52 182.14 103.76C176.05 102.34 163.47 100.28 157.57 101.43C129.21 103.36 97.59 97.45 69.9 104.19C61.33 106.28 52.99 109.9 45.36 114.34C41.09 116.82 37.28 120.83 32.92 122.94C32.25 119.17 32.02 102.54 32.79 98.89C33.11 97.4 33.68 96.62 33.64 94.92C34.65 94.26 38.78 82.02 40.34 79.38C46.82 68.45 57.65 59.62 69.96 56.23C81.78 52.97 94.69 54.18 106.84 54.18C127.26 54.18 147.68 54.18 168.09 54.18C230.91 54.18 293.72 54.18 356.53 54.18C374.3 54.18 392.07 54.18 409.83 54.18C427.8 54.18 445.18 53.92 459.58 66.21C465.67 71.42 470.78 78.28 473.76 85.73C474.95 88.71 475.14 92.72 476.7 95.39C476.92 94.61 477.15 93.83 477.37 93.05Z" fill="#c0bec0" fill-rule="evenodd" stroke="#c0bec0" stroke-width="0.25" stroke-linejoin="round"/>
+<path d="M157.57 101.43C155.85 102.6 153.38 101.3 151.41 102.03C145.57 104.21 138.75 105.09 132.64 107.2C113.3 113.87 95.75 128.77 85.35 146.36C68.77 174.42 72.1 204.96 72.1 236.36C72.1 286.86 72.1 337.36 72.1 387.86C72.1 399.24 72.1 410.61 72.1 421.99C72.1 439.74 71.95 456.6 80.2 472.74C88 487.98 101.55 500.14 117.29 506.67C120.36 507.94 123.63 509 126.84 509.83C129.76 510.59 133.94 510.34 136.46 511.92C112.02 511.92 87.58 511.92 63.13 511.92C61.68 510.57 59.95 511.29 58.21 510.89C54.62 510.05 51 509.01 47.52 507.78C37.92 504.38 28.54 498.28 21.34 490.92C13.94 483.34 7.73 474.38 4.21 464.48C2.98 461 1.92 457.39 1.11 453.79C0.71 452.04 1.4 450.39 0.08 448.89C0.08 360.37 0.08 271.84 0.08 183.31C1.88 181.39 1.47 175.86 2.08 173.22C3.28 167.96 5.05 162.45 7.25 157.53C11.14 148.85 16.37 139.78 23.03 132.65C26.12 129.35 30.16 126.46 32.92 122.94C37.28 120.83 41.09 116.82 45.36 114.34C52.99 109.9 61.33 106.28 69.9 104.19C97.59 97.45 129.21 103.36 157.57 101.43Z" fill="#126fc8" fill-rule="evenodd" stroke="#126fc8" stroke-width="0.25" stroke-linejoin="round"/>
+<path d="M77.19 0.08C196.07 0.08 314.95 0.08 433.83 0.08C435.57 1.68 439.76 1.2 442.09 2.1C447.23 4.07 453.07 6.32 457.39 9.97C467.12 18.21 475.74 29.89 477.12 42.78C478.03 51.23 477.54 60 477.54 68.5C477.54 76.45 478.55 85.2 477.37 93.05C477.15 93.83 476.92 94.61 476.7 95.39C475.14 92.72 474.95 88.71 473.76 85.73C470.78 78.28 465.67 71.42 459.58 66.21C445.18 53.92 427.8 54.18 409.83 54.18C392.07 54.18 374.3 54.18 356.53 54.18C293.72 54.18 230.91 54.18 168.09 54.18C147.68 54.18 127.26 54.18 106.84 54.18C94.69 54.18 81.78 52.97 69.96 56.23C57.65 59.62 46.82 68.45 40.34 79.38C38.78 82.02 34.65 94.26 33.64 94.92C32.06 88.36 33.36 78.28 33.36 71.31C33.36 50.46 31.75 29.52 48.66 14.29C53.92 9.55 59.7 5.66 66.17 3.06C68.81 2 75.44 1.58 77.19 0.08Z" fill="#8b8b8b" fill-rule="evenodd" stroke="#8b8b8b" stroke-width="0.25" stroke-linejoin="round"/>
+</svg>`;
+
+const createLogoImage = (pixelSize) => {
+    const bytes = GLib.Bytes.new(imports.byteArray.fromString(logoSvg));
+    const stream = Gio.MemoryInputStream.new_from_bytes(bytes);
+    const pixbuf = GdkPixbuf.Pixbuf.new_from_stream(stream, null);
+    const image = Gtk.Image.new_from_pixbuf(pixbuf);
+    image.set_pixel_size(pixelSize);
+    return image;
+};
 
 const FileItem = GObject.registerClass({
     Properties: {
@@ -39,6 +55,25 @@ class App extends Gtk.Application {
             
             tabbar tab:hover button.close {
                 opacity: 1;
+            }
+            
+            scrolledwindow.breadcrumb-bar {
+                background-color: #E6E6E6;
+                border-radius: 6px;
+                padding: 2px;
+
+            }
+            
+            scrolledwindow.breadcrumb-bar button {
+                background: transparent;
+                border: none;
+                box-shadow: none;
+                border-radius: 4px;
+                margin: 0 1px;
+            }
+
+            scrolledwindow.breadcrumb-bar button:hover {
+                background-color: rgba(120, 120, 120, 0.15);
             }
         `;
         cssProvider.load_from_data(cssString);
@@ -93,6 +128,71 @@ class App extends Gtk.Application {
 
         window.set_titlebar(windowHandle);
         window.set_child(tabView);
+
+        let aboutWindow = null;
+        const showAboutWindow = () => {
+            if (aboutWindow) {
+                aboutWindow.present();
+                return;
+            }
+
+            aboutWindow = new Gtk.Window({
+                transient_for: window,
+                modal: false,
+                title: 'À propos de Velora Explorer',
+                default_width: 420,
+                resizable: false,
+                destroy_with_parent: true
+            });
+
+            const box = new Gtk.Box({
+                orientation: Gtk.Orientation.VERTICAL,
+                spacing: 12,
+                margin_top: 24,
+                margin_bottom: 24,
+                margin_start: 24,
+                margin_end: 24
+            });
+            aboutWindow.set_child(box);
+
+            const icon = createLogoImage(64);
+            icon.set_halign(Gtk.Align.CENTER);
+            box.append(icon);
+
+            const title = new Gtk.Label({ label: 'Velora Explorer', halign: Gtk.Align.CENTER });
+            title.add_css_class('title-1');
+            box.append(title);
+
+            const version = new Gtk.Label({ label: 'Version 0.1.0', halign: Gtk.Align.CENTER });
+            version.add_css_class('dim-label');
+            box.append(version);
+
+            const info = new Gtk.Label({ label: 'Developpé par PRISM pour IUI', halign: Gtk.Align.CENTER });
+            info.add_css_class('dim-label');
+            box.append(info);
+
+            const description = new Gtk.Label({
+                label: 'Un explorateur de fichiers GTK4.',
+                wrap: true,
+                justify: Gtk.Justification.CENTER,
+                halign: Gtk.Align.CENTER
+            });
+            box.append(description);
+
+            const closeButton = new Gtk.Button({ label: 'Fermer', halign: Gtk.Align.CENTER });
+            closeButton.connect('clicked', () => aboutWindow.close());
+            box.append(closeButton);
+
+            aboutWindow.connect('close-request', () => {
+                aboutWindow = null;
+                return false;
+            });
+            aboutWindow.present();
+        };
+
+        const aboutAction = new Gio.SimpleAction({ name: 'about' });
+        aboutAction.connect('activate', showAboutWindow);
+        window.add_action(aboutAction);
         
         const tabRegistry = [];
 
@@ -525,6 +625,7 @@ class App extends Gtk.Application {
             let navCancellable = new Gio.Cancellable();
             const propertyWindows = new Set();
             const fileStore = new Gio.ListStore({ item_type: FileItem });
+            let directoryScanComplete = false;
 
             // Interface de l'onglet.
             const topBar = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 8, margin_top: 8, margin_bottom: 8, margin_start: 8, margin_end: 8 });
@@ -543,23 +644,293 @@ class App extends Gtk.Application {
             const btnRefresh = new Gtk.Button({ icon_name: 'view-refresh-symbolic' });
             topBar.append(btnRefresh);
 
-            const pathEntry = new Gtk.Entry({ hexpand: true, placeholder_text: "Chemin d'accès..." });
-            topBar.append(pathEntry);
+            const pathStack = new Gtk.Stack({ transition_type: Gtk.StackTransitionType.CROSSFADE, hexpand: true });
+            
+            const breadcrumbScroll = new Gtk.ScrolledWindow({ 
+                vscrollbar_policy: Gtk.PolicyType.NEVER,
+                hscrollbar_policy: Gtk.PolicyType.AUTOMATIC 
+            });
+            breadcrumbScroll.add_css_class('breadcrumb-bar');
+
+            const breadcrumbBox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 0 });
+            breadcrumbBox.add_css_class('linked');
+            breadcrumbScroll.set_child(breadcrumbBox);
+            
+            pathStack.add_named(breadcrumbScroll, "breadcrumbs");
+
+            const pathEntry = new Gtk.Entry({ placeholder_text: "Chemin d'accès...", hexpand: true });
+            pathStack.add_named(pathEntry, "entry");
+
+            topBar.append(pathStack);
+
+            const togglePathBtn = new Gtk.ToggleButton({ icon_name: 'document-edit-symbolic' });
+            togglePathBtn.connect('toggled', () => {
+                if (togglePathBtn.get_active()) {
+                    pathStack.set_visible_child_name("entry");
+                    pathEntry.grab_focus();
+                } else {
+                    pathStack.set_visible_child_name("breadcrumbs");
+                }
+            });
+            topBar.append(togglePathBtn);
+
+            const btnFavorite = new Gtk.Button({ icon_name: 'starred-symbolic', tooltip_text: 'Ajouter aux favoris' });
+            btnFavorite.add_css_class('flat');
+            topBar.append(btnFavorite);
+
+            const appMenu = new Gio.Menu();
+            appMenu.append('À propos', 'win.about');
+            const menuButton = new Gtk.MenuButton({
+                icon_name: 'open-menu-symbolic',
+                tooltip_text: 'Menu',
+                menu_model: appMenu
+            });
+            menuButton.add_css_class('flat');
+            topBar.append(menuButton);
 
             const searchEntry = new Gtk.SearchEntry({ placeholder_text: "Rechercher...", width_request: 200 });
             topBar.append(searchEntry);
 
+            const updateBreadcrumbs = (path) => {
+                let child = breadcrumbBox.get_first_child();
+                while (child) {
+                    breadcrumbBox.remove(child);
+                    child = breadcrumbBox.get_first_child();
+                }
+
+                if (path.startsWith('trash://')) {
+                    const btn = new Gtk.Button({ label: "Corbeille", icon_name: 'user-trash-symbolic' });
+                    btn.connect('clicked', () => loadDirectory('trash:///'));
+                    breadcrumbBox.append(btn);
+                    return;
+                }
+
+                const homeDir = GLib.get_home_dir();
+                let parts = [];
+                let currentBuiltPath = "";
+                let startWithHome = false;
+
+                const addSeparator = () => {
+                    const sep = new Gtk.Label({ label: " › ", css_classes: ['dim-label'] });
+                    breadcrumbBox.append(sep);
+                };
+
+                if (path === homeDir || path.startsWith(homeDir + '/')) {
+                    startWithHome = true;
+                    currentBuiltPath = homeDir;
+                    
+                    if (path === homeDir) {
+                        const homeBtn = new Gtk.Button();
+                        const btnBox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 6, margin_start: 4, margin_end: 4 });
+                        btnBox.append(new Gtk.Image({ icon_name: 'user-home-symbolic' }));
+                        btnBox.append(new Gtk.Label({ label: "Accueil" }));
+                        homeBtn.set_child(btnBox);
+
+                        homeBtn.connect('clicked', () => loadDirectory(homeDir));
+                        breadcrumbBox.append(homeBtn);
+                        return; // On s'arrête là
+                    }
+
+                    const homeBtn = new Gtk.Button({ icon_name: 'user-home-symbolic' });
+                    homeBtn.connect('clicked', () => loadDirectory(homeDir));
+                    breadcrumbBox.append(homeBtn);
+
+                    const relativePath = path.substring(homeDir.length);
+                    parts = relativePath.split('/').filter(p => p !== '');
+                } else {
+                    parts = path.split('/').filter(p => p !== '');
+                    
+                    const rootBtn = new Gtk.Button({ icon_name: 'drive-harddisk-system-symbolic' });
+                    rootBtn.connect('clicked', () => loadDirectory('/'));
+                    breadcrumbBox.append(rootBtn);
+                }
+
+                if (parts.length > 0) {
+                    addSeparator();
+                }
+
+                // On déroule les sous-dossiers après la maison
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    
+                    currentBuiltPath += '/' + part;
+                    const stepPath = currentBuiltPath;
+                    
+                    const btn = new Gtk.Button({ label: part });
+                    btn.connect('clicked', () => loadDirectory(stepPath));
+                    breadcrumbBox.append(btn);
+
+                    if (i < parts.length - 1) {
+                        addSeparator();
+                    }
+                }
+            };
+
             const paned = new Gtk.Paned({ vexpand: true }); 
             tabContent.append(paned);
 
-            // Navigation latérale et arborescence.
             const leftBox = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL });
             paned.set_start_child(leftBox);
             paned.set_position(250);
 
             const sidebarList = new Gtk.ListBox({ selection_mode: Gtk.SelectionMode.SINGLE });
             sidebarList.add_css_class('navigation-sidebar'); 
+
+            const locationDataFile = Gio.File.new_for_path(
+                GLib.build_filenamev([GLib.get_user_config_dir(), 'prism-explorer', 'locations.json'])
+            );
+            let favoriteLocations = [];
+            let recentLocations = [];
+
+            const loadLocationData = () => {
+                try {
+                    const [, contents] = locationDataFile.load_contents(null);
+                    const data = JSON.parse(imports.byteArray.toString(contents));
+                    favoriteLocations = Array.isArray(data.favorites) ? data.favorites : [];
+                    recentLocations = Array.isArray(data.recent) ? data.recent : [];
+                } catch (e) { }
+            };
+
+            const saveLocationData = () => {
+                try {
+                    locationDataFile.get_parent().make_directory_with_parents(null);
+                } catch (e) { }
+                try {
+                    locationDataFile.replace_contents(
+                        JSON.stringify({ favorites: favoriteLocations, recent: recentLocations }),
+                        null,
+                        false,
+                        Gio.FileCreateFlags.REPLACE_DESTINATION,
+                        null
+                    );
+                } catch (e) { }
+            };
+
+            const clearLocationRows = (list) => {
+                let row = list.get_first_child();
+                while (row) {
+                    const next = row.get_next_sibling();
+                    list.remove(row);
+                    row = next;
+                }
+            };
+
+            const createLocationRow = (list, location, canRemove = false) => {
+                const row = new Gtk.ListBoxRow();
+                row.targetPath = location.path;
+                const box = new Gtk.Box({
+                    orientation: Gtk.Orientation.HORIZONTAL,
+                    spacing: 8,
+                    margin_start: 10,
+                    margin_end: 6,
+                    margin_top: 5,
+                    margin_bottom: 5
+                });
+                box.append(new Gtk.Image({ icon_name: location.icon || 'folder-symbolic' }));
+                const label = new Gtk.Label({ label: location.name, xalign: 0, hexpand: true });
+                label.set_ellipsize(3);
+                box.append(label);
+                if (canRemove) {
+                    const removeButton = new Gtk.Button({ icon_name: 'window-close-symbolic', tooltip_text: 'Retirer des favoris' });
+                    removeButton.add_css_class('flat');
+                    removeButton.connect('clicked', () => {
+                        favoriteLocations = favoriteLocations.filter(item => item.path !== location.path);
+                        saveLocationData();
+                        rebuildLocationLists();
+                    });
+                    box.append(removeButton);
+                }
+                row.set_child(box);
+                list.append(row);
+            };
+
+            let locationsList = null;
+            let locationsView = null;
+            let locationsTitle = null;
+            let locationsMode = null;
+
+            const rebuildLocationLists = () => {
+                if (!locationsList) return;
+                clearLocationRows(locationsList);
+                const locations = locationsMode === 'recent' ? recentLocations : favoriteLocations;
+                locations.forEach(location => createLocationRow(locationsList, location, locationsMode !== 'recent'));
+            };
+
+            const showLocationsView = (mode) => {
+                locationsMode = mode;
+                rebuildLocationLists();
+                locationsTitle.set_text(mode === 'recent' ? 'Emplacements récents' : 'Favoris');
+                viewStack.set_visible_child_name('locations');
+            };
+
+            const locationsActions = new Gtk.ListBox({ selection_mode: Gtk.SelectionMode.SINGLE });
+            locationsActions.add_css_class('navigation-sidebar');
+            const createLocationActionRow = (iconName, labelText) => {
+                const row = new Gtk.ListBoxRow();
+                const content = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 10, margin_start: 10, margin_end: 10, margin_top: 8, margin_bottom: 8 });
+                content.append(new Gtk.Image({ icon_name: iconName }));
+                content.append(new Gtk.Label({ label: labelText, xalign: 0 }));
+                row.set_child(content);
+                return row;
+            };
+            locationsActions.append(createLocationActionRow('starred-symbolic', 'Favoris'));
+            locationsActions.append(createLocationActionRow('document-open-recent-symbolic', 'Emplacements récents'));
+            locationsActions.connect('row-activated', (list, row) => {
+                showLocationsView(row === list.get_row_at_index(0) ? 'favorites' : 'recent');
+                list.unselect_all();
+            });
+            leftBox.append(locationsActions);
+            leftBox.append(new Gtk.Separator({ margin_top: 5, margin_bottom: 5 }));
             leftBox.append(sidebarList);
+
+            const getLocationName = (path) => {
+                if (path === 'trash:///') return 'Corbeille';
+                return Gio.File.new_for_path(path).get_basename() || path;
+            };
+
+            const updateFavoriteButton = () => {
+                const path = currentDir && currentDir.get_uri();
+                const isFavorite = path && favoriteLocations.some(location => location.path === path);
+                btnFavorite.set_icon_name(isFavorite ? 'starred-symbolic' : 'non-starred-symbolic');
+                btnFavorite.set_tooltip_text(isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris');
+            };
+
+            const toggleCurrentFavorite = () => {
+                if (!currentDir) return;
+                const path = currentDir.get_uri();
+                const existingIndex = favoriteLocations.findIndex(location => location.path === path);
+                if (existingIndex >= 0) {
+                    favoriteLocations.splice(existingIndex, 1);
+                } else {
+                    favoriteLocations.unshift({
+                        path,
+                        name: getLocationName(currentDir.get_path() || path),
+                        icon: 'folder-symbolic'
+                    });
+                }
+                saveLocationData();
+                rebuildLocationLists();
+                updateFavoriteButton();
+            };
+
+            const recordRecentLocation = () => {
+                if (!currentDir) return;
+                const path = currentDir.get_uri();
+                recentLocations = recentLocations.filter(location => location.path !== path);
+                recentLocations.unshift({
+                    path,
+                    name: getLocationName(currentDir.get_path() || path),
+                    icon: path === 'trash:///' ? 'user-trash-symbolic' : 'folder-symbolic'
+                });
+                recentLocations = recentLocations.slice(0, 12);
+                saveLocationData();
+                rebuildLocationLists();
+            };
+
+            btnFavorite.connect('clicked', toggleCurrentFavorite);
+
+            loadLocationData();
+            rebuildLocationLists();
 
             const addSidebarItem = (iconName, labelText, targetPath) => {
                 if (!targetPath) return;
@@ -656,6 +1027,7 @@ class App extends Gtk.Application {
 
             sidebarList.connect('row-activated', (listbox, row) => {
                 if (row.targetPath) loadDirectory(row.targetPath);
+                listbox.unselect_all();
                 treeSelection.set_selected(Gtk.INVALID_LIST_POSITION); 
             });
             treeView.connect('activate', (view, pos) => {
@@ -674,8 +1046,45 @@ class App extends Gtk.Application {
             rightScroll.set_child(viewStack);
 
             const columnView = new Gtk.ColumnView({ model: selectionModel, hexpand: true, vexpand: true });
-            columnView.set_enable_rubberband(true);
-            viewStack.add_named(columnView, "list");
+            const listOverlay = new Gtk.Overlay();
+            listOverlay.set_child(columnView);
+            const emptyFolderLabel = new Gtk.Label({
+                label: 'Le dossier est vide',
+                halign: Gtk.Align.CENTER,
+                valign: Gtk.Align.CENTER
+            });
+            emptyFolderLabel.add_css_class('dim-label');
+            emptyFolderLabel.set_visible(false);
+            listOverlay.add_overlay(emptyFolderLabel);
+            viewStack.add_named(listOverlay, "list");
+            let gridView = null;
+
+            const updateEmptyFolderState = () => {
+                const hasItems = fileStore.get_n_items() > 0;
+                emptyFolderLabel.set_visible(directoryScanComplete && !hasItems);
+                columnView.set_enable_rubberband(hasItems);
+                if (gridView) gridView.set_enable_rubberband(hasItems);
+            };
+            const markDirectoryScanComplete = () => {
+                directoryScanComplete = true;
+                updateEmptyFolderState();
+            };
+            fileStore.connect('items-changed', updateEmptyFolderState);
+
+            const addDragSource = (item) => {
+                const dragSource = new Gtk.DragSource({ actions: Gdk.DragAction.COPY });
+                dragSource.connect('prepare', () => {
+                    const files = getSelectedFiles().map(selectedItem => selectedItem.file);
+                    if (files.length === 0) return null;
+
+                    const uriList = files.map(file => `${file.get_uri()}\r\n`).join('');
+                    return Gdk.ContentProvider.new_for_bytes(
+                        'text/uri-list',
+                        GLib.Bytes.new(new TextEncoder().encode(uriList))
+                    );
+                });
+                item.get_child().add_controller(dragSource);
+            };
 
             const gridFactory = new Gtk.SignalListItemFactory();
             _id = gridFactory.connect('setup', (f, item) => {
@@ -700,6 +1109,7 @@ class App extends Gtk.Application {
                 box.append(image);
                 box.append(label);
                 item.set_child(box);
+                addDragSource(item);
             });
             factoryHandlers.push({ factory: gridFactory, id: _id });
             _id = gridFactory.connect('bind', (f, item) => {
@@ -710,15 +1120,58 @@ class App extends Gtk.Application {
             });
             factoryHandlers.push({ factory: gridFactory, id: _id });
 
-            const gridView = new Gtk.GridView({ 
+            gridView = new Gtk.GridView({ 
                 model: selectionModel, 
                 factory: gridFactory, 
                 hexpand: true, 
                 vexpand: true,
                 max_columns: 20
             });
-            gridView.set_enable_rubberband(true);
             viewStack.add_named(gridView, "grid");
+
+            locationsList = new Gtk.ListBox({ selection_mode: Gtk.SelectionMode.SINGLE });
+            locationsList.add_css_class('navigation-sidebar');
+            locationsList.connect('row-activated', (list, row) => loadDirectory(row.targetPath));
+
+            locationsView = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 8 });
+            const locationsHeader = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 8, margin_top: 8, margin_start: 8, margin_end: 8 });
+            const backToFilesButton = new Gtk.Button({ icon_name: 'go-previous-symbolic', tooltip_text: 'Retour aux fichiers' });
+            backToFilesButton.add_css_class('flat');
+            backToFilesButton.connect('clicked', () => viewStack.set_visible_child_name('list'));
+            locationsTitle = new Gtk.Label({ label: 'Emplacements', xalign: 0, hexpand: true });
+            locationsTitle.add_css_class('title-3');
+            locationsHeader.append(backToFilesButton);
+            locationsHeader.append(locationsTitle);
+            locationsView.append(locationsHeader);
+            const locationsScroll = new Gtk.ScrolledWindow({ hexpand: true, vexpand: true });
+            locationsScroll.set_child(locationsList);
+            locationsView.append(locationsScroll);
+            viewStack.add_named(locationsView, 'locations');
+
+            const parseDroppedUris = (text) => text
+                .split(/\r?\n/)
+                .filter(line => line && !line.startsWith('#'))
+                .map(line => {
+                    try { return Gio.File.new_for_uri(line); } catch (e) { return null; }
+                })
+                .filter(file => file !== null);
+
+            const getDroppedFiles = (value) => {
+                if (value && typeof value.get_files === 'function') return value.get_files();
+                if (typeof value === 'string') return parseDroppedUris(value);
+                return [];
+            };
+
+            const dropTarget = Gtk.DropTarget.new(Gdk.FileList, Gdk.DragAction.COPY);
+            dropTarget.set_gtypes([Gdk.FileList, GObject.TYPE_STRING]);
+            dropTarget.connect('drop', (target, value) => {
+                if (!currentDir) return false;
+                const files = getDroppedFiles(value);
+                if (files.length === 0) return false;
+                FileOps.copy(files, currentDir, () => loadDirectory(currentDir.get_path(), false), (error) => console.error(error.message));
+                return true;
+            });
+            rightScroll.add_controller(dropTarget);
 
             // Colonnes de la vue liste.
             
@@ -727,6 +1180,7 @@ class App extends Gtk.Application {
                 const box = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 8 });
                 box.append(new Gtk.Image()); box.append(new Gtk.Label({ xalign: 0 }));
                 item.set_child(box);
+                addDragSource(item);
             });
             factoryHandlers.push({ factory: nameFactory, id: _id });
             _id = nameFactory.connect('bind', (f, item) => {
@@ -787,14 +1241,14 @@ class App extends Gtk.Application {
                                             }
                                         } catch (e) {
                                             activeSizeCancellables.delete(cancellable);
-                                            if (!cancellable.is_cancelled()) label.set_text("--");
+                                            if (!cancellable.is_cancelled()) label.set_text("  ");
                                         }
                                     });
                                 };
                                 countNextBatch();
                             } catch (e) {
                                 activeSizeCancellables.delete(cancellable);
-                                if (!cancellable.is_cancelled()) label.set_text("--");
+                                if (!cancellable.is_cancelled()) label.set_text("  ");
                             }
                         }
                     );
@@ -808,7 +1262,7 @@ class App extends Gtk.Application {
             factoryHandlers.push({ factory: dateFactory, id: _id });
             _id = dateFactory.connect('bind', (f, item) => {
                 const dt = item.get_item().info.get_modification_date_time();
-                item.get_child().set_text(dt ? dt.format("%d/%m/%Y %H:%M") : "--"); 
+                item.get_child().set_text(dt ? dt.format("%d/%m/%Y %H:%M") : "  "); 
             });
             factoryHandlers.push({ factory: dateFactory, id: _id });
 
@@ -817,7 +1271,7 @@ class App extends Gtk.Application {
             factoryHandlers.push({ factory: creationDateFactory, id: _id });
             _id = creationDateFactory.connect('bind', (f, item) => {
                 const dt = item.get_item().info.get_creation_date_time();
-                item.get_child().set_text(dt ? dt.format("%d/%m/%Y %H:%M") : "--"); 
+                item.get_child().set_text(dt ? dt.format("%d/%m/%Y %H:%M") : "  "); 
             });
             factoryHandlers.push({ factory: creationDateFactory, id: _id });
 
@@ -850,7 +1304,7 @@ class App extends Gtk.Application {
             factoryHandlers.push({ factory: keywordsFactory, id: _id });
             _id = keywordsFactory.connect('bind', (f, item) => {
                 const info = item.get_item().info;
-                const val = info.get_attribute_string('metadata::keywords') || info.get_attribute_string('metadata::annotation') || "--";
+                const val = info.get_attribute_string('metadata::keywords') || info.get_attribute_string('metadata::annotation') || "  ";
                 item.get_child().set_text(val);
             });
             factoryHandlers.push({ factory: keywordsFactory, id: _id });
@@ -860,7 +1314,7 @@ class App extends Gtk.Application {
             factoryHandlers.push({ factory: titleMetaFactory, id: _id });
             _id = titleMetaFactory.connect('bind', (f, item) => {
                 const info = item.get_item().info;
-                const val = info.get_attribute_string('metadata::title') || "--";
+                const val = info.get_attribute_string('metadata::title') || "  ";
                 item.get_child().set_text(val);
             });
             factoryHandlers.push({ factory: titleMetaFactory, id: _id });
@@ -948,8 +1402,99 @@ class App extends Gtk.Application {
                 const info = fileItem.info;
                 const childFile = fileItem.file;
 
+                const showSecurityDialog = (onOpenAsText) => {
+                    const dialog = new Gtk.Window({
+                        transient_for: window,
+                        modal: true,
+                        title: "Fichier exécutable non approuvé",
+                        default_width: 460,
+                        resizable: false
+                    });
+                    const box = new Gtk.Box({
+                        orientation: Gtk.Orientation.VERTICAL,
+                        spacing: 12,
+                        margin_top: 18,
+                        margin_bottom: 18,
+                        margin_start: 18,
+                        margin_end: 18
+                    });
+                    dialog.set_child(box);
+                    box.append(new Gtk.Label({
+                        label: `Le fichier « ${info.get_name()} » est un exécutable non approuvé. Que souhaitez-vous faire ?`,
+                        wrap: true,
+                        xalign: 0
+                    }));
+
+                    const buttons = new Gtk.Box({
+                        orientation: Gtk.Orientation.HORIZONTAL,
+                        spacing: 8,
+                        halign: Gtk.Align.END
+                    });
+                    const cancelButton = new Gtk.Button({ label: "Annuler" });
+                    const textButton = new Gtk.Button({ label: "Ouvrir comme texte" });
+                    const runButton = new Gtk.Button({ label: "Exécuter quand même" });
+
+                    runButton.add_css_class('destructive-action');
+
+                    runButton.connect('clicked', () => {
+                        dialog.close();
+                        try {
+                            const safePath = GLib.shell_quote(childFile.get_path());
+                            const appInfo = Gio.AppInfo.create_from_commandline(
+                                safePath, 
+                                null, 
+                                Gio.AppInfoCreateFlags.NONE
+                            );
+                            appInfo.launch([], null);
+                        } catch (e) {
+                            console.error("Impossible de lancer l'exécutable :", e.message);
+                        }
+                    });
+                    
+                    cancelButton.connect('clicked', () => dialog.close());
+                    textButton.connect('clicked', () => {
+                        dialog.close();
+                        onOpenAsText();
+                    });
+                    
+                    buttons.append(runButton);
+                    buttons.append(cancelButton);
+                    buttons.append(textButton);
+                    box.append(buttons);
+                    dialog.present();
+                };
+
+                const openAsText = () => {
+                    const textApp = Gio.AppInfo.get_default_for_type('text/plain', false);
+                    if (textApp) {
+                        try {
+                            textApp.launch([childFile], null);
+                            return;
+                        } catch (e) { }
+                    }
+                    console.error(`Aucun éditeur texte disponible pour ${info.get_name()}`);
+                };
+
+                let mode = 0;
+                try {
+                    const detailedInfo = childFile.query_info(
+                        'standard::type,standard::name,standard::content-type,unix::mode',
+                        Gio.FileQueryInfoFlags.NONE,
+                        null
+                    );
+                    mode = detailedInfo.get_attribute_uint32('unix::mode');
+                } catch (e) { }
+
+                const name = info.get_name().toLowerCase();
+                const sensitiveExtension = name.endsWith('.sh') ||
+                    name.endsWith('.bash') ||
+                    name.endsWith('.desktop');
+                const isExecutable = (mode & 0o111) !== 0;
+
                 if (!forceMenu && info.get_file_type() === Gio.FileType.DIRECTORY) {
                     loadDirectory(childFile.get_path());
+                } else if (isExecutable || sensitiveExtension) {
+                    showSecurityDialog(openAsText);
                 } else {
                     const launchChooser = () => {
                         const appChooser = new Gtk.AppChooserDialog({ transient_for: window, modal: true, gfile: childFile });
@@ -1110,8 +1655,18 @@ class App extends Gtk.Application {
                 const dialog = new Gtk.Window({ transient_for: window, modal: true, title: title, default_width: 300, resizable: false });
                 const box = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 12, margin_top: 15, margin_bottom: 15, margin_start: 15, margin_end: 15 });
                 dialog.set_child(box);
+                
                 const entry = new Gtk.Entry({ text: defaultName });
                 box.append(entry);
+
+                const errorLabel = new Gtk.Label({ 
+                    label: "Le caractère '/' est interdit.", 
+                    xalign: 0, 
+                    visible: false 
+                });
+                errorLabel.add_css_class('error');
+                box.append(errorLabel);
+
                 const btnBox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 10, halign: Gtk.Align.END });
                 const btnCancel = new Gtk.Button({ label: "Annuler" });
                 const btnCreate = new Gtk.Button({ label: "Créer" });
@@ -1119,7 +1674,25 @@ class App extends Gtk.Application {
                 box.append(btnBox);
 
                 btnCancel.connect('clicked', () => dialog.close());
-                const confirm = () => { if (entry.get_text().trim() !== "") { onConfirm(entry.get_text().trim()); dialog.close(); } };
+                
+                const confirm = () => { 
+                    const val = entry.get_text().trim();
+                    if (val !== "") { 
+                        if (val.includes('/')) {
+                            entry.add_css_class('error');
+                            errorLabel.set_visible(true);
+                            return; 
+                        }
+                        onConfirm(val); 
+                        dialog.close(); 
+                    } 
+                };
+
+                entry.connect('changed', () => {
+                    entry.remove_css_class('error');
+                    errorLabel.set_visible(false);
+                });
+
                 btnCreate.connect('clicked', confirm);
                 entry.connect('activate', confirm); 
                 dialog.present();
@@ -1289,9 +1862,74 @@ class App extends Gtk.Application {
                 propWin.present();
             };
             
-const loadDirectory = (path, recordHistory = true) => {
+            let directoryMonitor = null;
+            let monitorRefreshId = null;
+
+            const stopDirectoryMonitor = () => {
+                if (directoryMonitor) {
+                    directoryMonitor.cancel();
+                    directoryMonitor = null;
+                }
+                if (monitorRefreshId) {
+                    GLib.Source.remove(monitorRefreshId);
+                    monitorRefreshId = null;
+                }
+            };
+
+            const refreshMonitoredDirectory = () => {
+                monitorRefreshId = null;
+                if (isCleanedUp || !currentDir) return GLib.SOURCE_REMOVE;
+
+                const query = searchEntry.get_text().trim().toLowerCase();
+                fileStore.remove_all();
+                directoryScanComplete = false;
+                updateEmptyFolderState();
                 navCancellable.cancel();
                 navCancellable = new Gio.Cancellable();
+                searchCancellable.cancel();
+                searchCancellable = new Gio.Cancellable();
+
+                if (query === "") {
+                    scanDirectory(currentDir, navCancellable, "", false, markDirectoryScanComplete);
+                } else {
+                    scanDirectory(currentDir, searchCancellable, query, true, () => {
+                        pathEntry.set_text(`Recherche : ${query}`);
+                        pathEntry.set_sensitive(true);
+                        markDirectoryScanComplete();
+                    });
+                }
+                return GLib.SOURCE_REMOVE;
+            };
+
+            const scheduleMonitoredRefresh = () => {
+                if (monitorRefreshId) return;
+                monitorRefreshId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, refreshMonitoredDirectory);
+            };
+
+            const startDirectoryMonitor = () => {
+                stopDirectoryMonitor();
+                try {
+                    directoryMonitor = currentDir.monitor_directory(Gio.FileMonitorFlags.WATCH_MOVES, null);
+                    directoryMonitor.connect('changed', (monitor, file, otherFile, eventType) => {
+                        if (isCleanedUp) return;
+                        if (eventType === Gio.FileMonitorEvent.CHANGED ||
+                            eventType === Gio.FileMonitorEvent.CREATED ||
+                            eventType === Gio.FileMonitorEvent.DELETED ||
+                            eventType === Gio.FileMonitorEvent.MOVED_IN ||
+                            eventType === Gio.FileMonitorEvent.MOVED_OUT ||
+                            eventType === Gio.FileMonitorEvent.RENAMED) {
+                            scheduleMonitoredRefresh();
+                        }
+                    });
+                } catch (e) {
+                    directoryMonitor = null;
+                }
+            };
+
+            const loadDirectory = (path, recordHistory = true) => {
+                navCancellable.cancel();
+                navCancellable = new Gio.Cancellable();
+                stopDirectoryMonitor();
 
                 if (recordHistory && currentDir) {
                     const currentPath = currentDir.get_path();
@@ -1299,18 +1937,31 @@ const loadDirectory = (path, recordHistory = true) => {
                 }
 
                 fileStore.remove_all(); 
-                currentDir = path.startsWith('trash://') ? Gio.File.new_for_uri(path) : Gio.File.new_for_path(path);
+                directoryScanComplete = false;
+                updateEmptyFolderState();
+                currentDir = path.includes('://') ? Gio.File.new_for_uri(path) : Gio.File.new_for_path(path);
+                locationsMode = null;
+                locationsActions.unselect_all();
+                sidebarList.unselect_all();
+                viewStack.set_visible_child_name('list');
+                recordRecentLocation();
                 pathEntry.set_text(path); 
                 searchEntry.set_text(""); 
 
                 if (path.startsWith('trash://')) {
                     pathEntry.set_text("Corbeille");
                     page.set_title("Corbeille");
+                    updateBreadcrumbs("trash:///");
                 } else {
-                    pathEntry.set_text(path);
+                    const displayPath = currentDir.get_path() || path;
+                    pathEntry.set_text(displayPath);
                     const basename = currentDir.get_basename();
                     page.set_title(basename ? basename : "Système");
+                    updateBreadcrumbs(displayPath);
                 }
+                
+                togglePathBtn.set_active(false);
+                pathStack.set_visible_child_name("breadcrumbs");
 
                 try {
                     const info = currentDir.query_info('standard::icon', Gio.FileQueryInfoFlags.NONE, null);
@@ -1319,38 +1970,121 @@ const loadDirectory = (path, recordHistory = true) => {
                 
                 btnBack.set_sensitive(historyBack.length > 0);
                 btnForward.set_sensitive(historyForward.length > 0);
+                updateFavoriteButton();
 
-                scanDirectory(currentDir, navCancellable, "");
+                scanDirectory(currentDir, navCancellable, "", false, markDirectoryScanComplete);
+                startDirectoryMonitor();
             };
 
-            const scanDirectory = (dirObj, cancellable, searchQuery, isRecursive = false) => {
-                dirObj.enumerate_children_async('standard::*,time::*,metadata::*', Gio.FileQueryInfoFlags.NONE, GLib.PRIORITY_DEFAULT, cancellable, (sObj, res) => {
-                    try {
-                        const enumerator = sObj.enumerate_children_finish(res);
-                        const getNextBatch = () => {
-                            enumerator.next_files_async(50, GLib.PRIORITY_DEFAULT, cancellable, (eObj, eRes) => {
-                                try {
-                                    const files = eObj.next_files_finish(eRes);
-                                    if (files.length > 0) {
-                                        for (let info of files) {
-                                            if (!info.get_name().startsWith('.')) {
-                                                const childFile = sObj.get_child(info.get_name());
-                                                if (searchQuery === "" || info.get_name().toLowerCase().includes(searchQuery)) {
-                                                    fileStore.append(new FileItem({ info: info, file: childFile }));
-                                                }
-                                                if (isRecursive && info.get_file_type() === Gio.FileType.DIRECTORY) {
-                                                    scanDirectory(childFile, cancellable, searchQuery, true);
-                                                }
-                                            }
+            const scanDirectory = (dirObj, cancellable, searchQuery, isRecursive = false, onDone = null) => {
+                const searchState = {
+                    directoriesScanned: 0,
+                    resultsFound: 0,
+                    queue: [{ file: dirObj, depth: 0 }],
+                    maxDirectories: isRecursive ? 256 : Number.POSITIVE_INFINITY,
+                    maxResults: isRecursive ? 2000 : Number.POSITIVE_INFINITY,
+                    maxDepth: isRecursive ? 8 : 0,
+                    finished: false
+                };
+
+                const finish = () => {
+                    if (searchState.finished) return;
+                    searchState.finished = true;
+                    if (onDone && !cancellable.is_cancelled()) onDone();
+                };
+
+                let scanNext;
+                const scheduleScanNext = () => {
+                    GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                        scanNext();
+                        return GLib.SOURCE_REMOVE;
+                    });
+                };
+
+                scanNext = () => {
+                    if (cancellable.is_cancelled() || searchState.finished) return;
+                    if (searchState.queue.length === 0 ||
+                        searchState.directoriesScanned >= searchState.maxDirectories ||
+                        searchState.resultsFound >= searchState.maxResults) {
+                        finish();
+                        return;
+                    }
+
+                    const entry = searchState.queue.shift();
+                    searchState.directoriesScanned++;
+                    entry.file.enumerate_children_async(
+                        'standard::*,time::*,metadata::*',
+                        Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS,
+                        GLib.PRIORITY_DEFAULT,
+                        cancellable,
+                        (source, res) => {
+                            let enumerator;
+                            try {
+                                enumerator = source.enumerate_children_finish(res);
+                            } catch (e) {
+                                scheduleScanNext();
+                                return;
+                            }
+
+                            const scheduleReadBatch = () => {
+                                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                                    readBatch();
+                                    return GLib.SOURCE_REMOVE;
+                                });
+                            };
+
+                            const readBatch = () => {
+                                if (cancellable.is_cancelled()) {
+                                    enumerator.close_async(GLib.PRIORITY_DEFAULT, null, null);
+                                    return;
+                                }
+
+                                enumerator.next_files_async(50, GLib.PRIORITY_DEFAULT, cancellable, (batchSource, batchRes) => {
+                                    let files;
+                                    try {
+                                        files = batchSource.next_files_finish(batchRes);
+                                    } catch (e) {
+                                        enumerator.close_async(GLib.PRIORITY_DEFAULT, null, scheduleScanNext);
+                                        return;
+                                    }
+
+                                    if (files.length === 0) {
+                                        enumerator.close_async(GLib.PRIORITY_DEFAULT, null, scheduleScanNext);
+                                        return;
+                                    }
+
+                                    for (const info of files) {
+                                        if (info.get_name().startsWith('.')) continue;
+                                        const childFile = source.get_child(info.get_name());
+
+                                        if (info.get_name().toLowerCase().includes(searchQuery) &&
+                                            searchState.resultsFound < searchState.maxResults) {
+                                            fileStore.append(new FileItem({ info, file: childFile }));
+                                            searchState.resultsFound++;
                                         }
-                                        getNextBatch(); 
-                                    } else { enumerator.close_async(GLib.PRIORITY_DEFAULT, null, null); }
-                                } catch (e) { }
-                            });
-                        };
-                        getNextBatch();
-                    } catch (e) { }
-                });
+
+                                        if (isRecursive &&
+                                            info.get_file_type() === Gio.FileType.DIRECTORY &&
+                                            entry.depth < searchState.maxDepth &&
+                                            searchState.queue.length + searchState.directoriesScanned < searchState.maxDirectories) {
+                                            searchState.queue.push({ file: childFile, depth: entry.depth + 1 });
+                                        }
+                                    }
+
+                                    if (searchState.resultsFound >= searchState.maxResults) {
+                                        enumerator.close_async(GLib.PRIORITY_DEFAULT, null, () => finish());
+                                    } else {
+                                        scheduleReadBatch();
+                                    }
+                                });
+                            };
+
+                            scheduleReadBatch();
+                        }
+                    );
+                };
+
+                scanNext();
             };
 
 
@@ -1369,6 +2103,8 @@ const loadDirectory = (path, recordHistory = true) => {
                     searchCancellable = new Gio.Cancellable();
                     
                     fileStore.remove_all(); 
+                    directoryScanComplete = false;
+                    updateEmptyFolderState();
 
                     pathEntry.set_text(`Recherche de "${query}"...`);
                     pathEntry.set_sensitive(false);
@@ -1376,9 +2112,13 @@ const loadDirectory = (path, recordHistory = true) => {
                     if (query === "") {
                         if (currentDir) pathEntry.set_text(currentDir.get_path());
                         pathEntry.set_sensitive(true);
-                        scanDirectory(currentDir, searchCancellable, "");
+                        scanDirectory(currentDir, searchCancellable, "", false, markDirectoryScanComplete);
                     } else {
-                        scanDirectory(currentDir, searchCancellable, query, true);
+                        scanDirectory(currentDir, searchCancellable, query, true, () => {
+                            pathEntry.set_text(`Recherche : ${query}`);
+                            pathEntry.set_sensitive(true);
+                            markDirectoryScanComplete();
+                        });
                     }
                     return GLib.SOURCE_REMOVE;
                 });
@@ -1416,6 +2156,7 @@ const loadDirectory = (path, recordHistory = true) => {
 
                 navCancellable.cancel();
                 searchCancellable.cancel();
+                stopDirectoryMonitor();
                 if (searchTimeoutId) {
                     GLib.Source.remove(searchTimeoutId);
                     searchTimeoutId = null;
@@ -1430,6 +2171,11 @@ const loadDirectory = (path, recordHistory = true) => {
                     propWin.close();
                 }
                 propertyWindows.clear();
+
+                locationsMode = null;
+                locationsList = null;
+                locationsView = null;
+                locationsTitle = null;
 
                 // Ferme et détache les popovers avant que leur fenêtre parente ne soit détruite.
                 for (const menu of [colMenu, gridMenu]) {
