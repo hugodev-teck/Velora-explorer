@@ -611,6 +611,7 @@ class App extends Gtk.Application {
         this.set_accels_for_action('win.delete', ['Delete']);
         this.set_accels_for_action('win.properties', ['<Alt>Return']);
         this.set_accels_for_action('win.rename', ['F2']);
+        this.set_accels_for_action('win.connect-to-server', ['<Ctrl>l', '<Ctrl>k']);
 
 
         const createNewTab = (initialPath) => {
@@ -643,6 +644,13 @@ class App extends Gtk.Application {
 
             const btnRefresh = new Gtk.Button({ icon_name: 'view-refresh-symbolic' });
             topBar.append(btnRefresh);
+
+            const btnEject = new Gtk.Button({ 
+                icon_name: 'media-eject-symbolic', 
+                tooltip_text: "Éjecter le volume",
+                visible: false 
+            });
+            topBar.append(btnEject);
 
             const pathStack = new Gtk.Stack({ transition_type: Gtk.StackTransitionType.CROSSFADE, hexpand: true });
             
@@ -679,6 +687,7 @@ class App extends Gtk.Application {
             topBar.append(btnFavorite);
 
             const appMenu = new Gio.Menu();
+            appMenu.append('Se connecter au serveur…', 'win.connect-to-server');
             appMenu.append('À propos', 'win.about');
             const menuButton = new Gtk.MenuButton({
                 icon_name: 'open-menu-symbolic',
@@ -691,7 +700,7 @@ class App extends Gtk.Application {
             const searchEntry = new Gtk.SearchEntry({ placeholder_text: "Rechercher...", width_request: 200 });
             topBar.append(searchEntry);
 
-            const updateBreadcrumbs = (path) => {
+           const updateBreadcrumbs = (path) => {
                 let child = breadcrumbBox.get_first_child();
                 while (child) {
                     breadcrumbBox.remove(child);
@@ -702,6 +711,58 @@ class App extends Gtk.Application {
                     const btn = new Gtk.Button({ label: "Corbeille", icon_name: 'user-trash-symbolic' });
                     btn.connect('clicked', () => loadDirectory('trash:///'));
                     breadcrumbBox.append(btn);
+                    return;
+                }
+
+                let displayPath = path;
+                if (path.includes('/gvfs/')) {
+                    // On peut récupérer l'URI propre gérée par GIO si le path est un point de montage GVfs
+                    try {
+                        const gFile = Gio.File.new_for_path(path);
+                        const uri = gFile.get_uri();
+                        if (uri && !uri.startsWith('file://')) {
+                            displayPath = uri; // ex: smb://mon-serveur/partage
+                        }
+                    } catch (e) {}
+                }
+
+                // Si c'est une URI réseau (smb://, sftp://...)
+                if (displayPath.includes('://') && !displayPath.startsWith('file://')) {
+                    const uriObj = GLib.Uri.parse(displayPath, GLib.UriFlags.NONE);
+                    const scheme = uriObj ? uriObj.get_scheme() : 'reseau';
+                    const host = uriObj ? uriObj.get_host() : '';
+                    const extraPath = uriObj ? uriObj.get_path() : '';
+
+                    // Bouton racine du réseau (ex: [Serveur Réseau] smb://serveur)
+                    const netBtn = new Gtk.Button({ label: `${scheme}://${host}`, icon_name: 'network-server-symbolic' });
+                    netBtn.connect('clicked', () => loadDirectory(`${scheme}://${host}`));
+                    breadcrumbBox.append(netBtn);
+
+                    const parts = extraPath.split('/').filter(p => p !== '');
+                    let currentUri = `${scheme}://${host}`;
+
+                    const addSeparator = () => {
+                        const sep = new Gtk.Label({ label: " › ", css_classes: ['dim-label'] });
+                        breadcrumbBox.append(sep);
+                    };
+
+                    if (parts.length > 0) {
+                        addSeparator();
+                    }
+
+                    for (let i = 0; i < parts.length; i++) {
+                        const part = parts[i];
+                        currentUri += '/' + part;
+                        const stepPath = currentUri;
+
+                        const btn = new Gtk.Button({ label: part });
+                        btn.connect('clicked', () => loadDirectory(stepPath));
+                        breadcrumbBox.append(btn);
+
+                        if (i < parts.length - 1) {
+                            addSeparator();
+                        }
+                    }
                     return;
                 }
 
@@ -911,6 +972,7 @@ class App extends Gtk.Application {
                 saveLocationData();
                 rebuildLocationLists();
                 updateFavoriteButton();
+                updateEjectButtonState();
             };
 
             const recordRecentLocation = () => {
@@ -970,6 +1032,24 @@ class App extends Gtk.Application {
                 }
             }
 
+            // Mise à jour dynamique quand un partage réseau / volume est monté/démonté
+            const mountAddedId = volumeMonitor.connect('mount-added', (vm, mount) => {
+                const root = mount.get_root();
+                if (root) treeRootStore.append(root);
+            });
+            const mountRemovedId = volumeMonitor.connect('mount-removed', (vm, mount) => {
+                const root = mount.get_root();
+                if (!root) return;
+                const rootUri = root.get_uri();
+                for (let i = 0; i < treeRootStore.get_n_items(); i++) {
+                    const item = treeRootStore.get_item(i);
+                    if (item.get_uri() === rootUri) {
+                        treeRootStore.remove(i);
+                        break;
+                    }
+                }
+            });
+
             const treeModel = Gtk.TreeListModel.new(treeRootStore, false, false, (file) => {
                 const info = file.query_info('standard::type', Gio.FileQueryInfoFlags.NONE, null);
                 if (info.get_file_type() !== Gio.FileType.DIRECTORY) return null;
@@ -1012,12 +1092,40 @@ class App extends Gtk.Application {
                 expander.set_list_row(treeRow);
                 const box = expander.get_child();
                 
-                if (file.get_path() === '/') {
+                const uri = file.get_uri();
+                const path = file.get_path();
+
+                if (path === '/') {
                     box.get_last_child().set_text("Système de fichiers");
                     box.get_first_child().set_from_icon_name("drive-harddisk-system-symbolic");
                 } else {
-                    box.get_last_child().set_text(file.get_basename());
-                    box.get_first_child().set_from_icon_name("folder-symbolic"); 
+                    // On cherche proprement le volume ou le mount pour avoir le vrai nom (ex: "Ma Clef USB" au lieu de "BAF5-B5A6")
+                    let displayName = file.get_basename();
+                    let iconName = "folder-symbolic";
+
+                    try {
+                        const mounts = volumeMonitor.get_mounts();
+                        for (let mount of mounts) {
+                            const root = mount.get_root();
+                            if (root && root.get_uri() === uri) {
+                                displayName = mount.get_name();
+                                const icon = mount.get_icon();
+                                if (icon) box.get_first_child().set_from_gicon(icon);
+                                break;
+                            }
+                        }
+                    } catch (e) {}
+
+                    if (uri.startsWith('smb://') || uri.startsWith('sftp://') || uri.startsWith('nfs://')) {
+                        iconName = "network-server-symbolic";
+                    } else if (path && path.startsWith('/media/')) {
+                        iconName = "drive-removable-media-symbolic";
+                    }
+
+                    box.get_last_child().set_text(displayName);
+                    if (iconName !== "folder-symbolic" || !box.get_first_child().get_gicon()) {
+                        box.get_first_child().set_from_icon_name(iconName);
+                    }
                 }
             });
 
@@ -1861,6 +1969,95 @@ class App extends Gtk.Application {
 
                 propWin.present();
             };
+
+            // Connextion a un lecteur réseau
+            const connectServerAction = new Gio.SimpleAction({ name: 'connect-to-server' });
+            connectServerAction.connect('activate', () => {
+                const tab = getActiveTab();
+                if (!tab) return;
+
+                const dialog = new Gtk.Window({
+                    transient_for: window,
+                    modal: true,
+                    title: "Se connecter au serveur",
+                    default_width: 420,
+                    resizable: false
+                });
+
+                const box = new Gtk.Box({
+                    orientation: Gtk.Orientation.VERTICAL,
+                    spacing: 12,
+                    margin_top: 18, margin_bottom: 18,
+                    margin_start: 18, margin_end: 18
+                });
+                dialog.set_child(box);
+
+                box.append(new Gtk.Label({
+                    label: "Adresse du serveur (ex: smb://serveur/partage, sftp://host) :",
+                    xalign: 0,
+                    wrap: true
+                }));
+
+                const entry = new Gtk.Entry({ placeholder_text: "smb://192.168.1.100/partage" });
+                box.append(entry);
+
+                const statusLabel = new Gtk.Label({ xalign: 0, visible: false });
+                statusLabel.add_css_class('dim-label');
+                box.append(statusLabel);
+
+                const btnBox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 8, halign: Gtk.Align.END });
+                const cancelBtn = new Gtk.Button({ label: "Annuler" });
+                const connectBtn = new Gtk.Button({ label: "Se connecter" });
+                connectBtn.add_css_class('suggested-action');
+
+                cancelBtn.connect('clicked', () => dialog.close());
+
+                const doConnect = () => {
+                    const targetUri = entry.get_text().trim();
+                    if (!targetUri) return;
+
+                    connectBtn.set_sensitive(false);
+                    entry.set_sensitive(false);
+                    statusLabel.set_text("Connexion en cours...");
+                    statusLabel.set_visible(true);
+
+                    const targetFile = Gio.File.new_for_uri(targetUri);
+                    const mountOp = new Gtk.MountOperation({ parent: dialog });
+
+                    targetFile.mount_enclosing_volume(
+                        Gio.MountMountFlags.NONE,
+                        mountOp,
+                        null,
+                        (source, res) => {
+                            try {
+                                source.mount_enclosing_volume_finish(res);
+                                dialog.close();
+                                tab.loadDirectory(targetUri);
+                            } catch (err) {
+                                // Si l'erreur indique que le dossier est déjà monté, on charge directement
+                                if (err.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.ALREADY_MOUNTED)) {
+                                    dialog.close();
+                                    tab.loadDirectory(targetUri);
+                                } else {
+                                    statusLabel.set_text(`Erreur : ${err.message}`);
+                                    connectBtn.set_sensitive(true);
+                                    entry.set_sensitive(true);
+                                }
+                            }
+                        }
+                    );
+                };
+
+                connectBtn.connect('clicked', doConnect);
+                entry.connect('activate', doConnect);
+
+                btnBox.append(cancelBtn);
+                btnBox.append(connectBtn);
+                box.append(btnBox);
+
+                dialog.present();
+            });
+            window.add_action(connectServerAction);
             
             let directoryMonitor = null;
             let monitorRefreshId = null;
@@ -1974,6 +2171,7 @@ class App extends Gtk.Application {
 
                 scanDirectory(currentDir, navCancellable, "", false, markDirectoryScanComplete);
                 startDirectoryMonitor();
+                updateEjectButtonState();
             };
 
             const scanDirectory = (dirObj, cancellable, searchQuery, isRecursive = false, onDone = null) => {
@@ -2124,6 +2322,61 @@ class App extends Gtk.Application {
                 });
             });
 
+            let currentMount = null;
+
+            const updateEjectButtonState = () => {
+                currentMount = null;
+                btnEject.set_visible(false);
+
+                if (!currentDir) return;
+
+                try {
+                    const volumeMonitor = Gio.VolumeMonitor.get();
+                    const mounts = volumeMonitor.get_mounts();
+                    const currentPath = currentDir.get_path() || "";
+                    const currentUri = currentDir.get_uri() || "";
+
+                    for (let mount of mounts) {
+                        const root = mount.get_root();
+                        if (root) {
+                            const rootPath = root.get_path() || "";
+                            const rootUri = root.get_uri() || "";
+
+                            const isMatchPath = rootPath && (currentPath === rootPath || currentPath.startsWith(rootPath + '/'));
+                            const isMatchUri = rootUri && (currentUri === rootUri || currentUri.startsWith(rootUri + '/'));
+
+                            if (isMatchPath || isMatchUri) {
+                                currentMount = mount;
+                                btnEject.set_visible(true);
+                                break;
+                            }
+                        }
+                    }
+                } catch (e) {}
+            };
+
+            btnEject.connect('clicked', () => {
+                if (!currentMount) return;
+
+                btnEject.set_sensitive(false);
+                const mountOp = new Gtk.MountOperation({ parent: window });
+
+                currentMount.unmount_with_operation(
+                    Gio.MountUnmountFlags.NONE,
+                    mountOp,
+                    null,
+                    (source, res) => {
+                        try {
+                            source.unmount_with_operation_finish(res);
+                            loadDirectory(GLib.get_home_dir());
+                        } catch (err) {
+                            console.error("Erreur lors de l'éjection :", err.message);
+                            btnEject.set_sensitive(true);
+                        }
+                    }
+                );
+            });
+
             btnRefresh.connect('clicked', () => { if (currentDir) loadDirectory(currentDir.get_path()); });
             btnBack.connect('clicked', () => {
                 if (historyBack.length > 0) {
@@ -2176,6 +2429,9 @@ class App extends Gtk.Application {
                 locationsList = null;
                 locationsView = null;
                 locationsTitle = null;
+
+                volumeMonitor.disconnect(mountAddedId);
+                volumeMonitor.disconnect(mountRemovedId);
 
                 // Ferme et détache les popovers avant que leur fenêtre parente ne soit détruite.
                 for (const menu of [colMenu, gridMenu]) {
