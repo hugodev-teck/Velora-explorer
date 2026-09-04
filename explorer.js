@@ -76,7 +76,7 @@ class App extends Gtk.Application {
                 background-color: rgba(120, 120, 120, 0.15);
             }
         `;
-        cssProvider.load_from_data(cssString);
+        cssProvider.load_from_data(cssString, -1);
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(),
             cssProvider,
