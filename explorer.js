@@ -1646,7 +1646,6 @@ class App extends Gtk.Application {
 
             const tabId = Math.random().toString(36).substring(7);
 
-            // Actions de changement de vue.
             const viewGridAction = new Gio.SimpleAction({ name: `view-grid-${tabId}` });
             viewGridAction.connect('activate', () => viewStack.set_visible_child_name("grid"));
             window.add_action(viewGridAction);
@@ -1658,27 +1657,38 @@ class App extends Gtk.Application {
             columnView.connect('activate', (view, position) => openFileItem(fileStore.get_item(position), false));
             gridView.connect('activate', (view, position) => openFileItem(fileStore.get_item(position), false));
 
-            // Menu contextuel des fichiers.
             const attachRightClick = (widget) => {
-                const contextMenu = new Gtk.PopoverMenu({ has_arrow: false });
-                contextMenu.set_parent(window); 
-
                 const rightClickGesture = new Gtk.GestureClick({ button: 3 }); 
                 widget.add_controller(rightClickGesture);
+
+                let currentPopover = null;
 
                 rightClickGesture.connect('pressed', (gesture, n_press, x, y) => {
                     if (widget === columnView && y <= 40) return; 
                     
+                    if (currentPopover) {
+                        currentPopover.unparent();
+                        currentPopover = null;
+                    }
+
+                    currentPopover = new Gtk.PopoverMenu({ has_arrow: false });
+                    currentPopover.set_parent(window); 
+
+                    const safeRefs = [];
                     const menu = new Gio.Menu();
+                    safeRefs.push(menu);
+                    
                     const selectedFiles = getSelectedFiles();
 
                     if (selectedFiles.length > 0) {
                         const openSection = new Gio.Menu();
+                        safeRefs.push(openSection);
                         openSection.append("Ouvrir", "win.open"); 
                         openSection.append("Ouvrir avec...", "win.open-with");
                         menu.append_section(null, openSection);
 
                         const editSection = new Gio.Menu();
+                        safeRefs.push(editSection);
                         editSection.append("Couper", "win.cut");
                         editSection.append("Copier", "win.copy");
 
@@ -1692,26 +1702,32 @@ class App extends Gtk.Application {
 
                     if (this.clipboard && this.clipboard.files && this.clipboard.files.length > 0) {
                         const pasteSection = new Gio.Menu();
+                        safeRefs.push(pasteSection);
                         pasteSection.append(`Coller (${this.clipboard.files.length})`, "win.paste");
                         menu.append_section(null, pasteSection);
                     }
 
                     const affichageMenu = new Gio.Menu();
+                    safeRefs.push(affichageMenu);
                     affichageMenu.append("Grandes icônes", `win.view-grid-${tabId}`);
                     affichageMenu.append("Liste", `win.view-list-${tabId}`);
                     menu.append_submenu("Affichage", affichageMenu);
 
                     const trierMenu = new Gio.Menu();
+                    safeRefs.push(trierMenu);
                     trierMenu.append("Par nom", "win.menu-action");
                     trierMenu.append("Par date", "win.menu-action");
                     menu.append_submenu("Trier par", trierMenu);
 
                     const regrouperMenu = new Gio.Menu();
+                    safeRefs.push(regrouperMenu);
                     regrouperMenu.append("Aucun", "win.menu-action");
                     menu.append_submenu("Regrouper par", regrouperMenu);
 
                     const actionSection = new Gio.Menu();
                     const newMenu = new Gio.Menu();
+                    safeRefs.push(actionSection, newMenu);
+                    
                     newMenu.append("Dossier", "win.new-folder");
                     newMenu.append("Document texte", "win.new-file");
                     
@@ -1721,14 +1737,23 @@ class App extends Gtk.Application {
                     }
                     menu.append_section(null, actionSection);
 
-                    contextMenu.set_menu_model(menu);
+                    currentPopover.set_menu_model(menu);
+                    currentPopover._keepAlive = safeRefs;
+                    
+                    currentPopover.connect('closed', () => {
+                        const popoverToKill = currentPopover;
+                        GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                            if (popoverToKill) popoverToKill.unparent();
+                            return GLib.SOURCE_REMOVE;
+                        });
+                    });
                     
                     const event = gesture.get_last_event(null);
                     if (event) {
                         const [res, rootX, rootY] = event.get_position();
                         const headerHeight = window.get_allocated_height() - tabView.get_allocated_height();
                         
-                        contextMenu.set_pointing_to(new Gdk.Rectangle({ 
+                        currentPopover.set_pointing_to(new Gdk.Rectangle({ 
                             x: Math.round(rootX), 
                             y: Math.round(rootY - headerHeight), 
                             width: 0, 
@@ -1738,12 +1763,15 @@ class App extends Gtk.Application {
 
                     GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                         if (isCleanedUp) return GLib.SOURCE_REMOVE;
-                        contextMenu.popup();
+                        currentPopover.popup();
                         return GLib.SOURCE_REMOVE;
                     });
                 });
                 
-                return contextMenu;
+                return {
+                    popdown: () => { if (currentPopover) currentPopover.popdown(); },
+                    unparent: () => { if (currentPopover) currentPopover.unparent(); }
+                };
             };
 
             const colMenu = attachRightClick(columnView);
