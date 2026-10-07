@@ -1,7 +1,7 @@
 #!/usr/bin/gjs
 
 imports.gi.versions.Gtk = '4.0';
-const { Gtk, Gio, GObject, GLib, Gdk, GdkPixbuf, Adw } = imports.gi;
+const { Gtk, Gio, GObject, GLib, Gdk, GdkPixbuf, Adw, Graphene } = imports.gi;
 
 const logoSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
 <path d="M157.57 101.43C163.47 100.28 176.05 102.34 182.14 103.76C211.25 110.52 236.17 130.45 247.76 158.34C250.58 165.12 252.81 172.5 253.84 179.78C254.48 184.31 254.04 189.45 255.16 193.81C261.49 194.92 268.72 194.04 275.17 194.04C288.26 194.04 301.36 194.04 314.45 194.04C356.52 194.04 398.62 193.64 440.69 194.05C449.48 194.13 458.25 196.03 466.39 199.19C469.86 200.53 474.59 204.45 478.03 204.59C480.16 207.21 483.86 208.62 486.39 210.99C492.79 216.96 498.53 223.44 502.81 231.05C505.9 236.53 508.25 242.55 509.97 248.5C510.76 251.22 510.21 255.9 511.92 258.15C511.92 321.4 511.92 384.64 511.92 447.89C510.69 449.53 511.42 451.48 510.94 453.33C510.01 456.96 509.09 460.54 507.84 464.07C504.28 474.13 498.17 483.19 490.65 490.9C482.63 499.12 471.74 505.98 460.8 509.06C458.34 509.75 449.39 510.76 447.9 511.92C344.09 511.92 240.27 511.92 136.46 511.92C133.94 510.34 129.76 510.59 126.84 509.83C123.63 509 120.36 507.94 117.29 506.67C101.55 500.14 88 487.98 80.2 472.74C71.95 456.6 72.1 439.74 72.1 421.99C72.1 410.61 72.1 399.24 72.1 387.86C72.1 337.36 72.1 286.86 72.1 236.36C72.1 204.96 68.77 174.42 85.35 146.36C95.75 128.77 113.3 113.87 132.64 107.2C138.75 105.09 145.57 104.21 151.41 102.03C153.38 101.3 155.85 102.6 157.57 101.43Z" fill="#7da5ff" fill-rule="evenodd" stroke="#7da5ff" stroke-width="0.25" stroke-linejoin="round"/>
@@ -513,6 +513,43 @@ class App extends Gtk.Application {
             if (tab) tab.openWithSelected();
         });
         window.add_action(openWithAction);
+
+        const openTerminalAction = new Gio.SimpleAction({ name: 'open-terminal' });
+        openTerminalAction.connect('activate', () => {
+            const tab = getActiveTab();
+            if (!tab || !tab.currentDir) return;
+
+            const selectedFiles = tab.getSelectedFiles();
+            if (selectedFiles.length !== 1 || selectedFiles[0].info.get_file_type() !== Gio.FileType.DIRECTORY) return;
+
+            const terminalPath = selectedFiles[0].file.get_path();
+            const programs = [
+                ['kgx', ['--working-directory', terminalPath]],
+                ['gnome-terminal', ['--working-directory', terminalPath]],
+                ['konsole', ['--workdir', terminalPath]],
+                ['xfce4-terminal', ['--working-directory', terminalPath]],
+                ['mate-terminal', ['--working-directory', terminalPath]],
+                ['alacritty', ['--working-directory', terminalPath]],
+                ['x-terminal-emulator', ['--working-directory', terminalPath]]
+            ];
+
+            const command = programs.find(([program]) => GLib.find_program_in_path(program));
+            if (!command) {
+                console.error('Aucun terminal compatible détecté.');
+                return;
+            }
+
+            const [program, arguments_] = command;
+            try {
+                const subprocess = Gio.Subprocess.new([program, ...arguments_], Gio.SubprocessFlags.NONE);
+                if (!subprocess) {
+                    console.error(`Impossible de lancer le terminal : ${program}`);
+                }
+            } catch (e) {
+                console.error(`Impossible d’ouvrir le terminal : ${e.message}`);
+            }
+        });
+        window.add_action(openTerminalAction);
 
         const propertiesAction = new Gio.SimpleAction({ name: 'properties' });
         propertiesAction.connect('activate', () => {
@@ -1667,28 +1704,28 @@ class App extends Gtk.Application {
                     if (widget === columnView && y <= 40) return; 
                     
                     if (currentPopover) {
+                        currentPopover.popdown();
                         currentPopover.unparent();
                         currentPopover = null;
                     }
 
                     currentPopover = new Gtk.PopoverMenu({ has_arrow: false });
-                    currentPopover.set_parent(window); 
+                    currentPopover.set_parent(widget);
 
-                    const safeRefs = [];
                     const menu = new Gio.Menu();
-                    safeRefs.push(menu);
                     
                     const selectedFiles = getSelectedFiles();
 
                     if (selectedFiles.length > 0) {
                         const openSection = new Gio.Menu();
-                        safeRefs.push(openSection);
                         openSection.append("Ouvrir", "win.open"); 
                         openSection.append("Ouvrir avec...", "win.open-with");
+                        if (selectedFiles.length === 1 && selectedFiles[0].info.get_file_type() === Gio.FileType.DIRECTORY) {
+                            openSection.append("Ouvrir dans le terminal", "win.open-terminal");
+                        }
                         menu.append_section(null, openSection);
 
                         const editSection = new Gio.Menu();
-                        safeRefs.push(editSection);
                         editSection.append("Couper", "win.cut");
                         editSection.append("Copier", "win.copy");
 
@@ -1702,31 +1739,26 @@ class App extends Gtk.Application {
 
                     if (this.clipboard && this.clipboard.files && this.clipboard.files.length > 0) {
                         const pasteSection = new Gio.Menu();
-                        safeRefs.push(pasteSection);
                         pasteSection.append(`Coller (${this.clipboard.files.length})`, "win.paste");
                         menu.append_section(null, pasteSection);
                     }
 
                     const affichageMenu = new Gio.Menu();
-                    safeRefs.push(affichageMenu);
                     affichageMenu.append("Grandes icônes", `win.view-grid-${tabId}`);
                     affichageMenu.append("Liste", `win.view-list-${tabId}`);
                     menu.append_submenu("Affichage", affichageMenu);
 
                     const trierMenu = new Gio.Menu();
-                    safeRefs.push(trierMenu);
                     trierMenu.append("Par nom", "win.menu-action");
                     trierMenu.append("Par date", "win.menu-action");
                     menu.append_submenu("Trier par", trierMenu);
 
                     const regrouperMenu = new Gio.Menu();
-                    safeRefs.push(regrouperMenu);
                     regrouperMenu.append("Aucun", "win.menu-action");
                     menu.append_submenu("Regrouper par", regrouperMenu);
 
                     const actionSection = new Gio.Menu();
                     const newMenu = new Gio.Menu();
-                    safeRefs.push(actionSection, newMenu);
                     
                     newMenu.append("Dossier", "win.new-folder");
                     newMenu.append("Document texte", "win.new-file");
@@ -1738,26 +1770,19 @@ class App extends Gtk.Application {
                     menu.append_section(null, actionSection);
 
                     currentPopover.set_menu_model(menu);
-                    currentPopover._keepAlive = safeRefs;
-                    
-                    currentPopover.connect('closed', () => {
-                        const popoverToKill = currentPopover;
-                        GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-                            if (popoverToKill) popoverToKill.unparent();
-                            return GLib.SOURCE_REMOVE;
-                        });
+                    const popover = currentPopover;
+                    popover.connect('closed', () => {
+                        popover.unparent();
+                        if (currentPopover === popover) currentPopover = null;
                     });
-                    
-                    const event = gesture.get_last_event(null);
-                    if (event) {
-                        const [res, rootX, rootY] = event.get_position();
-                        const headerHeight = window.get_allocated_height() - tabView.get_allocated_height();
-                        
-                        currentPopover.set_pointing_to(new Gdk.Rectangle({ 
-                            x: Math.round(rootX), 
-                            y: Math.round(rootY - headerHeight), 
-                            width: 0, 
-                            height: 0 
+
+                    const point = new Graphene.Point({ x, y });
+                    if (widget.compute_point(widget, point)) {
+                        currentPopover.set_pointing_to(new Gdk.Rectangle({
+                            x: Math.round(point.x + 80),
+                            y: Math.round(point.y),
+                            width: 0,
+                            height: 0
                         }));
                     }
 
@@ -1770,7 +1795,7 @@ class App extends Gtk.Application {
                 
                 return {
                     popdown: () => { if (currentPopover) currentPopover.popdown(); },
-                    unparent: () => { if (currentPopover) currentPopover.unparent(); }
+                    destroy: () => { if (currentPopover) { currentPopover.popdown(); currentPopover.unparent(); currentPopover = null; } }
                 };
             };
 
@@ -2461,10 +2486,9 @@ class App extends Gtk.Application {
                 volumeMonitor.disconnect(mountAddedId);
                 volumeMonitor.disconnect(mountRemovedId);
 
-                // Ferme et détache les popovers avant que leur fenêtre parente ne soit détruite.
+                // Ferme et détruit les popovers avant que leur fenêtre parente ne soit détruite.
                 for (const menu of [colMenu, gridMenu]) {
-                    menu.popdown();
-                    menu.unparent();
+                    menu.destroy();
                 }
                 
             };
