@@ -56,6 +56,37 @@ class App extends Gtk.Application {
             tabbar tab:hover button.close {
                 opacity: 1;
             }
+
+            popover.menu > contents {
+                padding: 4px;
+            }
+
+            popover.menu button.modelbutton {
+                min-height: 24px;
+                padding: 2px 8px;
+                margin: 1px 2px;
+                border: none;
+                border-radius: 8px;
+                background: transparent;
+                box-shadow: none;
+                font-weight: normal;
+            }
+
+            popover.menu label.modelbutton-label {
+                font-weight: normal;
+            }
+
+            popover.menu button.modelbutton:hover {
+                background-color: alpha(@theme_fg_color, 0.08);
+            }
+
+            popover.menu button.modelbutton:active {
+                background-color: alpha(@theme_fg_color, 0.14);
+            }
+
+            popover.menu separator {
+                margin: 4px 8px;
+            }
             
             scrolledwindow.breadcrumb-bar {
                 background-color: #E6E6E6;
@@ -1695,6 +1726,11 @@ class App extends Gtk.Application {
             gridView.connect('activate', (view, position) => openFileItem(fileStore.get_item(position), false));
 
             const attachRightClick = (widget) => {
+                const activateWindowAction = (name) => {
+                    const action = window.lookup_action(name);
+                    if (action && action.get_enabled()) action.activate(null);
+                };
+
                 const rightClickGesture = new Gtk.GestureClick({ button: 3 }); 
                 widget.add_controller(rightClickGesture);
 
@@ -1709,68 +1745,130 @@ class App extends Gtk.Application {
                         currentPopover = null;
                     }
 
-                    currentPopover = new Gtk.PopoverMenu({ has_arrow: false });
-                    currentPopover.set_parent(widget);
+                    const popover = new Gtk.Popover({ has_arrow: false });
+                    currentPopover = popover;
+                    popover.set_parent(widget);
+                    popover.add_css_class('menu');
 
-                    const menu = new Gio.Menu();
-                    
+                    const menuBox = new Gtk.Box({
+                        orientation: Gtk.Orientation.VERTICAL,
+                        spacing: 0
+                    });
+                    menuBox.add_css_class('menu-list');
+                    popover.set_child(menuBox);
+
+                    const addMenuItem = (targetBox, label, callback) => {
+                        const button = new Gtk.Button({ hexpand: true, halign: Gtk.Align.FILL });
+                        button.add_css_class('flat');
+                        button.add_css_class('modelbutton');
+                        const text = new Gtk.Label({ label, xalign: 0, hexpand: true });
+                        text.add_css_class('modelbutton-label');
+                        button.set_child(text);
+                        button.connect('clicked', () => {
+                            popover.popdown();
+                            callback();
+                        });
+                        targetBox.append(button);
+                    };
+                    const addSeparator = (targetBox) => targetBox.append(new Gtk.Separator({
+                        orientation: Gtk.Orientation.HORIZONTAL
+                    }));
+                    const createSubmenu = (targetBox, label, items) => {
+                        const menuButton = new Gtk.MenuButton({
+                            hexpand: true,
+                            halign: Gtk.Align.FILL
+                        });
+                        menuButton.add_css_class('flat');
+                        menuButton.add_css_class('modelbutton');
+                        menuButton.set_direction(Gtk.ArrowType.RIGHT);
+
+                        const row = new Gtk.Box({
+                            orientation: Gtk.Orientation.HORIZONTAL,
+                            spacing: 12
+                        });
+                        const submenuLabel = new Gtk.Label({ label, xalign: 0, hexpand: true });
+                        submenuLabel.add_css_class('modelbutton-label');
+                        row.append(submenuLabel);
+                        row.append(new Gtk.Image({ icon_name: 'pan-end-symbolic' }));
+                        menuButton.set_child(row);
+
+                        const submenu = new Gtk.Popover({ has_arrow: false });
+                        submenu.add_css_class('menu');
+                        submenu.set_offset(8, 0);
+                        const submenuBox = new Gtk.Box({
+                            orientation: Gtk.Orientation.VERTICAL,
+                            spacing: 0
+                        });
+                        submenuBox.add_css_class('menu-list');
+                        submenu.set_child(submenuBox);
+                        menuButton.set_popover(submenu);
+
+                        for (const item of items) {
+                            if (item.separator) {
+                                addSeparator(submenuBox);
+                            } else {
+                                addMenuItem(submenuBox, item.label, item.callback);
+                            }
+                        }
+                        targetBox.append(menuButton);
+                    };
+
                     const selectedFiles = getSelectedFiles();
 
                     if (selectedFiles.length > 0) {
-                        const openSection = new Gio.Menu();
-                        openSection.append("Ouvrir", "win.open"); 
-                        openSection.append("Ouvrir avec...", "win.open-with");
+                        addMenuItem(menuBox, "Ouvrir", () => openSelected());
+                        addMenuItem(menuBox, "Ouvrir avec...", () => openWithSelected());
                         if (selectedFiles.length === 1 && selectedFiles[0].info.get_file_type() === Gio.FileType.DIRECTORY) {
-                            openSection.append("Ouvrir dans le terminal", "win.open-terminal");
+                            addMenuItem(menuBox, "Ouvrir dans le terminal", () => activateWindowAction('open-terminal'));
                         }
-                        menu.append_section(null, openSection);
+                        addSeparator(menuBox);
 
-                        const editSection = new Gio.Menu();
-                        editSection.append("Couper", "win.cut");
-                        editSection.append("Copier", "win.copy");
+                        addMenuItem(menuBox, "Couper", () => activateWindowAction('cut'));
+                        addMenuItem(menuBox, "Copier", () => activateWindowAction('copy'));
 
                         if (selectedFiles.length === 1) {
-                            editSection.append("Renommer", "win.rename");
+                            addMenuItem(menuBox, "Renommer", () => activateWindowAction('rename'));
                         }
 
-                        editSection.append("Supprimer", "win.delete");
-                        menu.append_section(null, editSection);
+                        addMenuItem(menuBox, "Supprimer", () => activateWindowAction('delete'));
+                        addSeparator(menuBox);
                     }
 
                     if (this.clipboard && this.clipboard.files && this.clipboard.files.length > 0) {
-                        const pasteSection = new Gio.Menu();
-                        pasteSection.append(`Coller (${this.clipboard.files.length})`, "win.paste");
-                        menu.append_section(null, pasteSection);
+                        addMenuItem(menuBox, `Coller (${this.clipboard.files.length})`, () => activateWindowAction('paste'));
+                        addSeparator(menuBox);
                     }
 
-                    const affichageMenu = new Gio.Menu();
-                    affichageMenu.append("Grandes icônes", `win.view-grid-${tabId}`);
-                    affichageMenu.append("Liste", `win.view-list-${tabId}`);
-                    menu.append_submenu("Affichage", affichageMenu);
-
-                    const trierMenu = new Gio.Menu();
-                    trierMenu.append("Par nom", "win.menu-action");
-                    trierMenu.append("Par date", "win.menu-action");
-                    menu.append_submenu("Trier par", trierMenu);
-
-                    const regrouperMenu = new Gio.Menu();
-                    regrouperMenu.append("Aucun", "win.menu-action");
-                    menu.append_submenu("Regrouper par", regrouperMenu);
-
-                    const actionSection = new Gio.Menu();
-                    const newMenu = new Gio.Menu();
-                    
-                    newMenu.append("Dossier", "win.new-folder");
-                    newMenu.append("Document texte", "win.new-file");
-                    
-                    actionSection.append_submenu("Nouveau", newMenu);
+                    createSubmenu(menuBox, "Affichage", [
+                        { label: "Grandes icônes", callback: () => viewStack.set_visible_child_name("grid") },
+                        { label: "Liste", callback: () => viewStack.set_visible_child_name("list") }
+                    ]);
+                    createSubmenu(menuBox, "Trier par", [
+                        { label: "Par nom", callback: () => activateWindowAction('menu-action') },
+                        { label: "Par date", callback: () => activateWindowAction('menu-action') }
+                    ]);
+                    createSubmenu(menuBox, "Regrouper par", [
+                        { label: "Aucun", callback: () => activateWindowAction('menu-action') }
+                    ]);
+                    createSubmenu(menuBox, "Nouveau", [
+                        { label: "Dossier", callback: () => {
+                            if (!currentDir) return;
+                            promptNewName("Nouveau dossier", "Nouveau dossier", (name) => {
+                                FileOps.mkdir(currentDir, name, () => loadDirectory(currentDir.get_path(), false));
+                            });
+                        } },
+                        { label: "Document texte", callback: () => {
+                            if (!currentDir) return;
+                            promptNewName("Nouveau fichier", "Nouveau document.txt", (name) => {
+                                FileOps.mkfile(currentDir, name, () => loadDirectory(currentDir.get_path(), false));
+                            });
+                        } }
+                    ]);
                     if (selectedFiles.length == 1) {
-                        actionSection.append("Propriétés", "win.properties");
+                        addSeparator(menuBox);
+                        addMenuItem(menuBox, "Propriétés", () => activateWindowAction('properties'));
                     }
-                    menu.append_section(null, actionSection);
 
-                    currentPopover.set_menu_model(menu);
-                    const popover = currentPopover;
                     popover.connect('closed', () => {
                         popover.unparent();
                         if (currentPopover === popover) currentPopover = null;
