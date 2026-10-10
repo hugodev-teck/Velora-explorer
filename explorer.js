@@ -265,6 +265,31 @@ class App extends Gtk.Application {
 
         this.clipboard = { action: null, files: [] };
 
+        const viewModesFile = Gio.File.new_for_path(
+            GLib.build_filenamev([GLib.get_user_config_dir(), 'prism-explorer', 'view-modes.json'])
+        );
+        let directoryViewModes = {};
+        try {
+            const [, contents] = viewModesFile.load_contents(null);
+            const savedModes = JSON.parse(imports.byteArray.toString(contents));
+            if (savedModes && typeof savedModes === 'object' && !Array.isArray(savedModes)) {
+                directoryViewModes = savedModes;
+            }
+        } catch (e) { }
+
+        const saveDirectoryViewModes = () => {
+            try {
+                viewModesFile.get_parent().make_directory_with_parents(null);
+                viewModesFile.replace_contents(
+                    JSON.stringify(directoryViewModes),
+                    null,
+                    false,
+                    Gio.FileCreateFlags.REPLACE_DESTINATION,
+                    null
+                );
+            } catch (e) { }
+        };
+
         // Opérations fichiers asynchrones.
         const FileOps = {
             _showProgress: (title, fileName, hasProgress, operationCallback) => {
@@ -756,6 +781,7 @@ class App extends Gtk.Application {
 
             const appMenu = new Gio.Menu();
             appMenu.append('Se connecter au serveur…', 'win.connect-to-server');
+            appMenu.append('Affichage des colonnes…', 'win.columns');
             appMenu.append('À propos', 'win.about');
             const menuButton = new Gtk.MenuButton({
                 icon_name: 'open-menu-symbolic',
@@ -1221,6 +1247,13 @@ class App extends Gtk.Application {
             const viewStack = new Gtk.Stack({ transition_type: Gtk.StackTransitionType.CROSSFADE });
             rightScroll.set_child(viewStack);
 
+            const setDirectoryViewMode = (mode) => {
+                viewStack.set_visible_child_name(mode);
+                if (!currentDir) return;
+                directoryViewModes[currentDir.get_uri()] = mode;
+                saveDirectoryViewModes();
+            };
+
             const columnView = new Gtk.ColumnView({ model: selectionModel, hexpand: true, vexpand: true });
             const listOverlay = new Gtk.Overlay();
             listOverlay.set_child(columnView);
@@ -1313,7 +1346,10 @@ class App extends Gtk.Application {
             const locationsHeader = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 8, margin_top: 8, margin_start: 8, margin_end: 8 });
             const backToFilesButton = new Gtk.Button({ icon_name: 'go-previous-symbolic', tooltip_text: 'Retour aux fichiers' });
             backToFilesButton.add_css_class('flat');
-            backToFilesButton.connect('clicked', () => viewStack.set_visible_child_name('list'));
+            backToFilesButton.connect('clicked', () => {
+                const mode = currentDir ? directoryViewModes[currentDir.get_uri()] || 'list' : 'list';
+                viewStack.set_visible_child_name(mode);
+            });
             locationsTitle = new Gtk.Label({ label: 'Emplacements', xalign: 0, hexpand: true });
             locationsTitle.add_css_class('title-3');
             locationsHeader.append(backToFilesButton);
@@ -1524,12 +1560,7 @@ class App extends Gtk.Application {
 
             rebuildColumns(); 
 
-            const headerClick = new Gtk.GestureClick({ button: 1 });
-            columnView.add_controller(headerClick);
-
-            headerClick.connect('pressed', (gesture, n_press, x, y) => {
-                if (y > 40) return; 
-
+            const showColumnSettings = () => {
                 const colWin = new Gtk.Window({
                     transient_for: window,
                     modal: false,
@@ -1547,8 +1578,8 @@ class App extends Gtk.Application {
                 });
                 colWin.set_child(box);
 
-                box.append(new Gtk.Label({ 
-                    label: "Colonnes à afficher :", 
+                box.append(new Gtk.Label({
+                    label: "Colonnes à afficher :",
                     xalign: 0,
                     css_classes: ['heading']
                 }));
@@ -1556,22 +1587,35 @@ class App extends Gtk.Application {
                 box.append(new Gtk.Separator({ margin_bottom: 5 }));
 
                 for (let conf of columnConfig) {
-                    const check = new Gtk.CheckButton({ 
-                        label: conf.title, 
-                        active: conf.visible 
+                    const check = new Gtk.CheckButton({
+                        label: conf.title,
+                        active: conf.visible
                     });
-                    
-                    if (conf.locked) check.set_sensitive(false); 
-                    
+
+                    if (conf.locked) check.set_sensitive(false);
+
                     check.connect('toggled', () => {
                         conf.visible = check.get_active();
                         rebuildColumns();
                     });
-                    
+
                     box.append(check);
                 }
 
                 colWin.present();
+            };
+
+            const columnsAction = new Gio.SimpleAction({ name: 'columns' });
+            columnsAction.connect('activate', showColumnSettings);
+            window.add_action(columnsAction);
+
+            const headerClick = new Gtk.GestureClick({ button: 3 });
+            columnView.add_controller(headerClick);
+            headerClick.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
+
+            headerClick.connect('pressed', (gesture, n_press, x, y) => {
+                if (y > 40) return; 
+                showColumnSettings();
             });
 
             const openFileItem = (fileItem, forceMenu = false) => {
@@ -1715,11 +1759,11 @@ class App extends Gtk.Application {
             const tabId = Math.random().toString(36).substring(7);
 
             const viewGridAction = new Gio.SimpleAction({ name: `view-grid-${tabId}` });
-            viewGridAction.connect('activate', () => viewStack.set_visible_child_name("grid"));
+            viewGridAction.connect('activate', () => setDirectoryViewMode("grid"));
             window.add_action(viewGridAction);
 
             const viewListAction = new Gio.SimpleAction({ name: `view-list-${tabId}` });
-            viewListAction.connect('activate', () => viewStack.set_visible_child_name("list"));
+            viewListAction.connect('activate', () => setDirectoryViewMode("list"));
             window.add_action(viewListAction);
 
             columnView.connect('activate', (view, position) => openFileItem(fileStore.get_item(position), false));
@@ -1840,8 +1884,8 @@ class App extends Gtk.Application {
                     }
 
                     createSubmenu(menuBox, "Affichage", [
-                        { label: "Grandes icônes", callback: () => viewStack.set_visible_child_name("grid") },
-                        { label: "Liste", callback: () => viewStack.set_visible_child_name("list") }
+                        { label: "Grandes icônes", callback: () => setDirectoryViewMode("grid") },
+                        { label: "Liste", callback: () => setDirectoryViewMode("list") }
                     ]);
                     createSubmenu(menuBox, "Trier par", [
                         { label: "Par nom", callback: () => activateWindowAction('menu-action') },
@@ -2291,7 +2335,7 @@ class App extends Gtk.Application {
                 locationsMode = null;
                 locationsActions.unselect_all();
                 sidebarList.unselect_all();
-                viewStack.set_visible_child_name('list');
+                viewStack.set_visible_child_name(directoryViewModes[currentDir.get_uri()] || 'list');
                 recordRecentLocation();
                 pathEntry.set_text(path); 
                 searchEntry.set_text(""); 
