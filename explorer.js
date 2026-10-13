@@ -579,31 +579,59 @@ class App extends Gtk.Application {
             if (selectedFiles.length !== 1 || selectedFiles[0].info.get_file_type() !== Gio.FileType.DIRECTORY) return;
 
             const terminalPath = selectedFiles[0].file.get_path();
-            const programs = [
-                ['kgx', ['--working-directory', terminalPath]],
-                ['gnome-terminal', ['--working-directory', terminalPath]],
-                ['konsole', ['--workdir', terminalPath]],
-                ['xfce4-terminal', ['--working-directory', terminalPath]],
-                ['mate-terminal', ['--working-directory', terminalPath]],
-                ['alacritty', ['--working-directory', terminalPath]],
-                ['x-terminal-emulator', ['--working-directory', terminalPath]]
-            ];
+            const launchFallbackTerminal = () => {
+                const programs = [
+                    ['kgx', ['--working-directory', terminalPath]],
+                    ['gnome-terminal', ['--working-directory', terminalPath]],
+                    ['konsole', ['--workdir', terminalPath]],
+                    ['xfce4-terminal', ['--working-directory', terminalPath]],
+                    ['mate-terminal', ['--working-directory', terminalPath]],
+                    ['alacritty', ['--working-directory', terminalPath]],
+                    ['x-terminal-emulator', ['--working-directory', terminalPath]]
+                ];
 
-            const command = programs.find(([program]) => GLib.find_program_in_path(program));
-            if (!command) {
-                console.error('Aucun terminal compatible détecté.');
-                return;
-            }
-
-            const [program, arguments_] = command;
-            try {
-                const subprocess = Gio.Subprocess.new([program, ...arguments_], Gio.SubprocessFlags.NONE);
-                if (!subprocess) {
-                    console.error(`Impossible de lancer le terminal : ${program}`);
+                for (const [program, arguments_] of programs) {
+                    if (!GLib.find_program_in_path(program)) continue;
+                    try {
+                        Gio.Subprocess.new([program, ...arguments_], Gio.SubprocessFlags.NONE);
+                        return;
+                    } catch (error) {
+                        console.error(`Impossible de lancer ${program} : ${error.message}`);
+                    }
                 }
-            } catch (e) {
-                console.error(`Impossible d’ouvrir le terminal : ${e.message}`);
+                console.error('Aucun terminal compatible détecté.');
+            };
+
+            const xdgTerminalExec = GLib.find_program_in_path('xdg-terminal-exec');
+            if (xdgTerminalExec) {
+                try {
+                    const subprocess = Gio.Subprocess.new(
+                        [
+                            xdgTerminalExec,
+                            '--',
+                            'sh',
+                            '-c',
+                            'cd "$1" && exec "${SHELL:-/bin/sh}"',
+                            'prism-explorer-terminal',
+                            terminalPath
+                        ],
+                        Gio.SubprocessFlags.NONE
+                    );
+                    subprocess.wait_check_async(null, (source, result) => {
+                        try {
+                            source.wait_check_finish(result);
+                        } catch (error) {
+                            console.error(`Échec de xdg-terminal-exec : ${error.message}`);
+                            launchFallbackTerminal();
+                        }
+                    });
+                    return;
+                } catch (error) {
+                    console.error(`Impossible de lancer xdg-terminal-exec : ${error.message}`);
+                }
             }
+
+            launchFallbackTerminal();
         });
         window.add_action(openTerminalAction);
 
@@ -778,6 +806,13 @@ class App extends Gtk.Application {
             const btnFavorite = new Gtk.Button({ icon_name: 'starred-symbolic', tooltip_text: 'Ajouter aux favoris' });
             btnFavorite.add_css_class('flat');
             topBar.append(btnFavorite);
+
+            const previewToggle = new Gtk.ToggleButton({
+                icon_name: 'document-properties-symbolic',
+                tooltip_text: 'Afficher ou masquer l’aperçu'
+            });
+            previewToggle.add_css_class('flat');
+            topBar.append(previewToggle);
 
             const appMenu = new Gio.Menu();
             appMenu.append('Se connecter au serveur…', 'win.connect-to-server');
@@ -1239,7 +1274,6 @@ class App extends Gtk.Application {
 
             // Vue des fichiers.
             const rightScroll = new Gtk.ScrolledWindow({ hexpand: true, vexpand: true });
-            paned.set_end_child(rightScroll);
             
             const selectionModel = new Gtk.MultiSelection({ model: fileStore });
 
@@ -1384,6 +1418,74 @@ class App extends Gtk.Application {
                 return true;
             });
             rightScroll.add_controller(dropTarget);
+
+            const previewPane = new Gtk.Box({
+                orientation: Gtk.Orientation.VERTICAL,
+                spacing: 8,
+                margin_top: 12,
+                margin_bottom: 12,
+                margin_start: 12,
+                margin_end: 12,
+                width_request: 260
+            });
+            previewPane.append(new Gtk.Label({
+                label: 'Aperçu',
+                xalign: 0,
+                css_classes: ['title-3']
+            }));
+            const previewStack = new Gtk.Stack({
+                hexpand: true,
+                vexpand: true,
+                transition_type: Gtk.StackTransitionType.CROSSFADE
+            });
+            const previewMessage = new Gtk.Label({
+                label: 'Sélectionnez un fichier pour afficher son aperçu.',
+                wrap: true,
+                xalign: 0,
+                valign: Gtk.Align.START
+            });
+            previewMessage.add_css_class('dim-label');
+            previewStack.add_named(previewMessage, 'message');
+
+            const previewPicture = new Gtk.Picture({
+                hexpand: true,
+                vexpand: true,
+                halign: Gtk.Align.CENTER,
+                valign: Gtk.Align.CENTER
+            });
+            previewStack.add_named(previewPicture, 'image');
+
+            const previewText = new Gtk.TextView({
+                editable: false,
+                cursor_visible: false,
+                monospace: true,
+                wrap_mode: Gtk.WrapMode.WORD_CHAR,
+                left_margin: 8,
+                right_margin: 8,
+                top_margin: 8,
+                bottom_margin: 8
+            });
+            const previewTextScroll = new Gtk.ScrolledWindow({ hexpand: true, vexpand: true });
+            previewTextScroll.set_child(previewText);
+            previewStack.add_named(previewTextScroll, 'text');
+            previewPane.append(previewStack);
+
+            const fileAreaPaned = new Gtk.Paned({
+                orientation: Gtk.Orientation.HORIZONTAL,
+                hexpand: true,
+                vexpand: true
+            });
+            fileAreaPaned.set_start_child(rightScroll);
+            fileAreaPaned.set_end_child(previewPane);
+            previewPane.set_visible(false);
+            paned.set_end_child(fileAreaPaned);
+
+            previewToggle.connect('toggled', () => {
+                previewPane.set_visible(previewToggle.get_active());
+                if (previewToggle.get_active()) {
+                    fileAreaPaned.set_position(Math.max(350, fileAreaPaned.get_width() - 300));
+                }
+            });
 
             // Colonnes de la vue liste.
             
@@ -1954,6 +2056,160 @@ class App extends Gtk.Application {
                 return files;
             };
 
+            let previewCancellable = new Gio.Cancellable();
+            let previewDebounceId = null;
+            let previewRequestId = 0;
+            let previewPdfProcess = null;
+            let previewPdfTempFile = null;
+            let previewPdfImageFile = null;
+            const cancelPreviewDebounce = () => {
+                if (previewDebounceId !== null) {
+                    GLib.Source.remove(previewDebounceId);
+                    previewDebounceId = null;
+                }
+            };
+            const clearPdfPreviewFiles = () => {
+                for (const file of [previewPdfImageFile, previewPdfTempFile]) {
+                    try {
+                        if (file && file.query_exists(null)) file.delete(null);
+                    } catch (error) {
+                        console.error(`Impossible de supprimer un fichier temporaire d’aperçu : ${error.message}`);
+                    }
+                }
+                previewPdfImageFile = null;
+                previewPdfTempFile = null;
+            };
+            const stopPdfPreview = () => {
+                if (previewPdfProcess) {
+                    previewPdfProcess.force_exit();
+                    previewPdfProcess = null;
+                }
+                clearPdfPreviewFiles();
+            };
+            const showPreviewMessage = (message) => {
+                previewMessage.set_text(message);
+                previewStack.set_visible_child_name('message');
+            };
+            const showPreviewText = (text) => {
+                previewText.get_buffer().set_text(text, -1);
+                previewStack.set_visible_child_name('text');
+            };
+            const updatePreview = () => {
+                previewCancellable.cancel();
+                previewCancellable = new Gio.Cancellable();
+                stopPdfPreview();
+                const requestId = ++previewRequestId;
+                const selectedFiles = getSelectedFiles();
+
+                if (selectedFiles.length === 0) {
+                    showPreviewMessage('Sélectionnez un fichier pour afficher son aperçu.');
+                    return;
+                }
+                if (selectedFiles.length !== 1) {
+                    showPreviewMessage('Sélectionnez un seul fichier pour afficher son aperçu.');
+                    return;
+                }
+
+                const fileItem = selectedFiles[0];
+                const info = fileItem.info;
+                const file = fileItem.file;
+                if (info.get_file_type() === Gio.FileType.DIRECTORY) {
+                    showPreviewMessage('L’aperçu des dossiers n’est pas disponible.');
+                    return;
+                }
+
+                const name = info.get_name();
+                const contentType = info.get_content_type() || '';
+                const mimeType = contentType ? Gio.content_type_get_mime_type(contentType) : '';
+
+                if (mimeType && mimeType.startsWith('image/')) {
+                    previewPicture.set_file(file);
+                    previewStack.set_visible_child_name('image');
+                    return;
+                }
+
+                if (mimeType === 'application/pdf' || name.toLowerCase().endsWith('.pdf')) {
+                    const path = file.get_path();
+                    if (!path) {
+                        showPreviewMessage('L’aperçu PDF nécessite un fichier accessible localement.');
+                        return;
+                    }
+
+                    showPreviewMessage('Chargement de l’aperçu PDF…');
+                    try {
+                        const [tempFile, tempStream] = Gio.File.new_tmp('prism-explorer-preview-XXXXXX');
+                        previewPdfTempFile = tempFile;
+                        tempStream.close(null);
+                        previewPdfImageFile = Gio.File.new_for_path(`${tempFile.get_path()}.png`);
+
+                        const process = Gio.Subprocess.new(
+                            ['pdftoppm', '-f', '1', '-l', '1', '-scale-to', '1200', '-singlefile', '-png', path, tempFile.get_path()],
+                            Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
+                        );
+                        previewPdfProcess = process;
+                        process.communicate_utf8_async(null, previewCancellable, (source, result) => {
+                            if (requestId !== previewRequestId) return;
+                            previewPdfProcess = null;
+                            try {
+                                const [, , stderr] = source.communicate_utf8_finish(result);
+                                if (!source.get_successful()) {
+                                    showPreviewMessage(stderr.trim() || 'Impossible de rendre ce fichier PDF.');
+                                    clearPdfPreviewFiles();
+                                } else if (previewPdfImageFile && previewPdfImageFile.query_exists(null)) {
+                                    previewPicture.set_file(previewPdfImageFile);
+                                    previewStack.set_visible_child_name('image');
+                                } else {
+                                    showPreviewMessage('Impossible de rendre la première page du PDF.');
+                                    clearPdfPreviewFiles();
+                                }
+                            } catch (error) {
+                                if (!previewCancellable.is_cancelled()) {
+                                    showPreviewMessage(`Impossible de rendre le PDF : ${error.message}`);
+                                }
+                                clearPdfPreviewFiles();
+                            }
+                        });
+                    } catch (error) {
+                        showPreviewMessage('Aperçu PDF indisponible : pdftoppm est requis.');
+                        clearPdfPreviewFiles();
+                    }
+                    return;
+                }
+
+                if (mimeType && mimeType.startsWith('text/')) {
+                    const fileSize = info.get_size();
+                    if (fileSize > 1024 * 1024) {
+                        showPreviewMessage('Le fichier texte dépasse la limite d’aperçu de 1 Mo.');
+                        return;
+                    }
+
+                    file.load_contents_async(previewCancellable, (source, result) => {
+                        if (requestId !== previewRequestId) return;
+                        try {
+                            const [, contents] = source.load_contents_finish(result);
+                            showPreviewText(imports.byteArray.toString(contents).slice(0, 50000));
+                        } catch (error) {
+                            if (!previewCancellable.is_cancelled()) {
+                                showPreviewMessage(`Impossible de lire le fichier : ${error.message}`);
+                            }
+                        }
+                    });
+                    showPreviewMessage('Chargement de l’aperçu…');
+                    return;
+                }
+
+                showPreviewMessage(`Aucun aperçu disponible pour « ${name} ».`);
+            };
+            const schedulePreviewUpdate = () => {
+                cancelPreviewDebounce();
+                previewDebounceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
+                    previewDebounceId = null;
+                    updatePreview();
+                    return GLib.SOURCE_REMOVE;
+                });
+            };
+            selectionModel.connect('selection-changed', schedulePreviewUpdate);
+
             const promptNewName = (title, defaultName, onConfirm) => {
                 const dialog = new Gtk.Window({ transient_for: window, modal: true, title: title, default_width: 300, resizable: false });
                 const box = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 12, margin_top: 15, margin_bottom: 15, margin_start: 15, margin_end: 15 });
@@ -2322,6 +2578,12 @@ class App extends Gtk.Application {
                 navCancellable.cancel();
                 navCancellable = new Gio.Cancellable();
                 stopDirectoryMonitor();
+                cancelPreviewDebounce();
+                previewCancellable.cancel();
+                previewCancellable = new Gio.Cancellable();
+                stopPdfPreview();
+                previewRequestId++;
+                showPreviewMessage('Sélectionnez un fichier pour afficher son aperçu.');
 
                 if (recordHistory && currentDir) {
                     const currentPath = currentDir.get_path();
@@ -2329,6 +2591,7 @@ class App extends Gtk.Application {
                 }
 
                 fileStore.remove_all(); 
+                cancelPreviewDebounce();
                 directoryScanComplete = false;
                 updateEmptyFolderState();
                 currentDir = path.includes('://') ? Gio.File.new_for_uri(path) : Gio.File.new_for_path(path);
@@ -2604,6 +2867,9 @@ class App extends Gtk.Application {
 
                 navCancellable.cancel();
                 searchCancellable.cancel();
+                cancelPreviewDebounce();
+                previewCancellable.cancel();
+                stopPdfPreview();
                 stopDirectoryMonitor();
                 if (searchTimeoutId) {
                     GLib.Source.remove(searchTimeoutId);
